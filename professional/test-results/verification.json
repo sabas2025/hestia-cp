@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-10-15T23:30:44.608875+00:00",
+  "installer_executed": false,
+  "vps_accessed": false,
+  "checks": [
+    {
+      "name": "bash -n hst-install.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-common.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-debian.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-ubuntu.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint model.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/professional/model.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint view.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/professional/view.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint index.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/professional/index.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP authorization and data-scoping assertions",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\n    \"checks\": 29,\n    \"status\": \"passed\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP test runtime",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)\nCopyright (c) The PHP Group\nZend Engine v4.3.6, Copyright (c) Zend Technologies\n",
+      "stderr": ""
+    },
+    {
+      "name": "ShellCheck new shared code",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "ShellCheck installer error-level findings",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "JavaScript syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Browser desktop and mobile",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\n  \"status\": \"passed\",\n  \"viewports\": 3,\n  \"reports\": [\n    {\n      \"viewport\": 360,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 768,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 1440,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "python": {
+    "tests": 43,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "php_runtime": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)",
+  "status": "passed"
+}

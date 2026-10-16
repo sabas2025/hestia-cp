@@ -1,75 +1,136 @@
-# Hestia CP — preparação de conexão à VPS
+> Pacote modificado HestiaCP Professional 1.0.0 (15/10/2026), baseado na revisão registrada em [UPSTREAM.json](UPSTREAM.json). Comece por [PROFISSIONAL.md](PROFISSIONAL.md) e consulte [ENTREGA.md](ENTREGA.md) para alterações, testes e limites. Não é uma release oficial do HestiaCP.
+>
+> Para conexão de diagnóstico à VPS como root na porta 22, siga [CONEXAO-SSH.md](CONEXAO-SSH.md). Publicar este código no GitHub não instala o painel na VPS.
+>
+> Os workflows originais foram preservados em `docs/upstream-workflows/` como referência. O workflow ativo deste repositório é o diagnóstico SSH manual; ele depende dos Secrets e da preparação do servidor descritos no guia.
 
-Este repositório contém um fluxo **manual de diagnóstico SSH** para a VPS. Acesso solicitado: usuário `root`, porta `22`. O IP precisa ser confirmado pelo proprietário.
+<h1 align="center"><a href="https://www.hestiacp.com/">Hestia Control Panel</a></h1>
 
-O fluxo executa somente `/usr/local/sbin/hestia-github-diagnostico`. Ele consulta sistema, diretórios de painéis, versões PHP, serviços, disco e memória. Não instala o Hestia, não publica a aplicação e não lê senhas, tokens ou arquivos de configuração privados.
+![HestiaCP Web Interface screenshot](https://storage.hestiacp.com/hestiascreen.png)
 
-## 1. Criar uma chave dedicada
+<h2 align="center">Lightweight and powerful control panel for the modern web</h2>
 
-No seu computador, crie uma chave exclusiva para esse diagnóstico:
+<p align="center"><strong>Latest stable release:</strong> Version 1.10.5 | <a href="https://github.com/hestiacp/hestiacp/blob/release/CHANGELOG.md">View Changelog</a></p>
+
+<p align="center">
+	<a href="https://www.hestiacp.com/">HestiaCP.com</a> |
+	<a href="https://docs.hestiacp.com/">Documentation</a> |
+	<a href="https://forum.hestiacp.com/">Forum</a>
+	<br/><br/>
+	<a href="https://github.com/hestiacp/hestiacp/actions/workflows/lint.yml">
+		<img src="https://github.com/hestiacp/hestiacp/actions/workflows/lint.yml/badge.svg" alt="Lint Status"/>
+	</a>
+	<a href="https://gurubase.io/g/hestia">
+		<img src="https://img.shields.io/badge/Gurubase-Ask%20Hestia%20Guru-006BFF" alt="Gurubase"/>
+	</a>
+</p>
+
+## **Welcome!**
+
+Hestia Control Panel is designed to provide administrators an easy to use web and command line interface, enabling them to quickly deploy and manage web domains, mail accounts, DNS zones, and databases from one central dashboard without the hassle of manually deploying and configuring individual components or services.
+
+## Donate
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=ST87LQH2CHGLA)<br /><br />
+Bitcoin : bc1q48jt5wg5jaj8g9zy7c3j03cv57j2m2u5anlutu<br>
+Ethereum : 0xfF3Dd2c889bd0Ff73d8085B84A314FC7c88e5D51<br>
+Binance: bnb1l4ywvw5ejfmsgjdcx8jn5lxj7zsun8ktfu7rh8<br>
+Smart Chain: 0xfF3Dd2c889bd0Ff73d8085B84A314FC7c88e5D51<br>
+
+Project infrastructure is partly provided by [infrahost](https://infrahost.ch/en/).
+
+## Features and Services
+
+- Apache2 and NGINX with PHP-FPM
+- PHP 8.4 as the default for this modified installer; see [PROFISSIONAL.md](PROFISSIONAL.md) for the supported selection.
+- DNS Server (Bind) with clustering capabilities
+- POP/IMAP/SMTP mail services with Anti-Virus, Anti-Spam, and Webmail (ClamAV, SpamAssassin, Sieve, Roundcube)
+- MariaDB/MySQL and/or PostgreSQL databases
+- Let's Encrypt SSL support with wildcard certificates
+- Firewall with brute-force attack detection and IP lists (iptables, fail2ban, and ipset).
+
+## Supported platforms and operating systems
+
+- **Debian:** 13, 12
+- **Ubuntu:** 26.04 LTS, 24.04 LTS, 22.04 LTS
+
+**NOTES:**
+
+- Hestia Control Panel does not support 32 bit operating systems!
+- Hestia Control Panel in combination with OpenVZ 7 or lower might have issues with DNS and/or firewall. If you use a Virtual Private Server we strongly advice you to use something based on KVM or LXC!
+
+## Installing Hestia Control Panel
+
+- **NOTE:** You must install Hestia Control Panel on top of a fresh operating system installation to ensure proper functionality.
+
+While we have taken every effort to make the installation process and the control panel interface as friendly as possible (even for new users), it is assumed that you will have some prior knowledge and understanding in the basics how to set up a Linux server before continuing.
+
+### Step 1: Log in
+
+To start the installation, you will need to be logged in as **root** or a user with super-user privileges. You can perform the installation either directly from the command line console or remotely via SSH:
 
 ```bash
-ssh-keygen -t ed25519 -C github-hestia-diagnostico -f github-hestia-diagnostico
+ssh root@your.server
 ```
 
-Use uma chave dedicada sem passphrase para esse fluxo e restrinja sua permissão no servidor conforme a próxima etapa. A chave pública termina em `.pub`; a chave privada é o arquivo sem `.pub`. A chave privada deve ser colocada somente no Secret correspondente do GitHub, sem passar pelo chat ou pelo repositório.
+### Step 2: Download this repository
 
-## 2. Preparar o comando restrito na VPS
-
-No console confiável da VPS, como root, baixe e revise o script:
+Download the complete source tree, including the shared installer and dependency lock:
 
 ```bash
-wget -O /root/vps-diagnostico.sh https://raw.githubusercontent.com/sabas2025/hestia-cp/main/ops/vps-diagnostico.sh
-bash -n /root/vps-diagnostico.sh
+git clone https://github.com/sabas2025/hestia-cp.git
+cd hestia-cp
+sha256sum -c SHA256SUMS
 ```
 
-Depois de revisar o conteúdo, instale o comando:
+### Step 3: Inspect before installing
 
 ```bash
-install -o root -g root -m 0755 /root/vps-diagnostico.sh /usr/local/sbin/hestia-github-diagnostico
+bash install/hst-install.sh --preflight
 ```
 
-Acrescente em `/root/.ssh/authorized_keys` a chave pública dedicada, com estas opções na mesma linha, preservando as chaves já existentes:
-
-```text
-restrict,command="/usr/local/sbin/hestia-github-diagnostico" ssh-ed25519 SUA_CHAVE_PUBLICA github-hestia-diagnostico
-```
-
-O diretório `/root/.ssh` deve pertencer a root com modo 0700; `authorized_keys`, a root com modo 0600. A restrição prende essa chave ao diagnóstico e impede seu uso como terminal geral ou encaminhamento SSH.
-
-## 3. Conferir a identidade do servidor
-
-No console confiável da VPS, consulte a fingerprint e a chave pública do host:
+The inspection does not install the panel. Installation requires a fresh supported OS and explicit `--apply`:
 
 ```bash
-ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
-cat /etc/ssh/ssh_host_ed25519_key.pub
+bash install/hst-install.sh --apply
 ```
 
-Construa a linha `known_hosts` com o IP confirmado e a chave do host, sem alterar os valores:
+Read [PROFISSIONAL.md](PROFISSIONAL.md) before installation, including the existing-panel checks, authentication, backup setup and operational validation still required. Do not use the official single-file download to obtain the modifications in this repository.
 
-```text
-IP_CONFIRMADO ssh-ed25519 CHAVE_PUBLICA_DO_HOST
+## How to upgrade an existing installation
+
+Automatic Updates are enabled by default on new installations of Hestia Control Panel and can be managed from **Server Settings > Updates**. To manually check for and install available updates, use the apt package manager:
+
+```bash
+apt-get update
+apt-get upgrade
 ```
 
-A chave pública do host é diferente da chave pública dedicada do usuário. O fluxo não aceita automaticamente uma chave de host obtida da rede.
+## Issues & Support Requests
 
-## 4. Cadastrar os Secrets
+- If you encounter a general problem while using Hestia Control Panel and need help, please [visit our forum](https://forum.hestiacp.com/) to search for potential solutions or post a new thread where community members can assist.
+- Bugs and other reproducible issues should be filed via GitHub by [creating a new issue report](https://github.com/hestiacp/hestiacp/issues) so that our developers can investigate further. Please note that requests for support will be redirected to our forum.
 
-Abra **Settings → Secrets and variables → Actions → New repository secret**:
+**IMPORTANT: We _cannot_ provide support for requests that do not describe the troubleshooting steps that have already been performed, or for third-party applications not related to Hestia Control Panel (such as WordPress). Please make sure that you include as much information as possible in your forum posts or issue reports!**
 
-| Nome | Conteúdo |
-|---|---|
-| `VPS_HOST` | IP ou hostname confirmado da VPS |
-| `VPS_SSH_KEY` | Conteúdo completo da chave privada dedicada, incluindo BEGIN e END |
-| `VPS_KNOWN_HOSTS` | Linha `known_hosts` conferida no console da VPS |
+## Contributions
 
-Configuração: https://github.com/sabas2025/hestia-cp/settings/secrets/actions
+If you would like to contribute to the project, please [read our Contribution Guidelines](https://github.com/hestiacp/hestiacp/blob/release/CONTRIBUTING.md) for a brief overview of our development process and standards.
 
-O conector utilizado nesta conversa não permite cadastrar ou ler Secrets. Essa etapa deve ser feita pelo proprietário no GitHub.
+## Copyright
 
-## 5. Executar
+"Hestia Control Panel", "HestiaCP", and the Hestia logo are original copyright of hestiacp.com and the following restrictions apply:
 
-Abra **Actions → Diagnostico SSH da VPS → Run workflow → main → Run workflow**. O workflow não roda em push, pull request ou agendamento. Seus logs mostrarão o resultado do diagnóstico; a conexão só estará confirmada após uma execução bem-sucedida.
+**You are allowed to:**
 
-Os arquivos do pacote HestiaCP Professional entregue anteriormente ainda não foram importados neste repositório. Esta preparação é dedicada à conexão e ao diagnóstico inicial. Instalar ou migrar o painel é uma etapa posterior; o instalador do Hestia exige sistema limpo.
+- use the names "Hestia Control Panel", "HestiaCP", or the Hestia logo in any context directly related to the application or the project. This includes the application itself, local communities and news or blog posts.
+
+**You are not allowed to:**
+
+- sell or redistribute the application under the name "Hestia Control Panel", "HestiaCP", or similar derivatives, including the use of the Hestia logo in any brand or marketing materials related to revenue generating activities,
+- use the names "Hestia Control Panel", "HestiaCP", or the Hestia logo in any context that is not related to the project,
+- alter the name "Hestia Control Panel", "HestiaCP", or the Hestia logo in any way.
+
+## License
+
+Hestia Control Panel is licensed under [GPL v3](https://github.com/hestiacp/hestiacp/blob/release/LICENSE) license, and is based on the [VestaCP](https://vestacp.com/) project.<br>

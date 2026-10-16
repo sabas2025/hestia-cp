@@ -1,0 +1,8 @@
+{
+  "assets": 13,
+  "cached_hashes": "all matched",
+  "source": "HTTPS sources in install/assets.lock.tsv",
+  "signature_claimed": false,
+  "local_deb_paths_with_spaces": "preserved in both installers",
+  "full_stack_installation": "not executed"
+}

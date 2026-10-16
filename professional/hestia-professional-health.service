@@ -1,0 +1,20 @@
+[Unit]
+Description=Hestia Professional read-only health snapshot
+After=hestia.service
+ConditionPathExists=/usr/local/hestia/conf/hestia.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/hestia/professional/health.py --write
+User=root
+Group=root
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/usr/local/hestia/data/professional
+TimeoutStartSec=180
+# Critical health is a collected result, not a failure to run the collector.
+SuccessExitStatus=2
+

@@ -1,0 +1,15 @@
+[Unit]
+Description=Encrypted Hestia backup for %i
+After=hestia.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/hestiacp/professional/backup.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/hestia/professional/backup.py run --user %i --config /etc/hestiacp/professional/backup.json --apply
+User=root
+Group=root
+UMask=0077
+PrivateTmp=true
+TimeoutStartSec=6h
+

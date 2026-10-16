@@ -1,3 +1,54 @@
+# Packages
+*.tar
+*.zip
+*.gzip
+*.gz
+*.bz2
+*.deb
+
+# Editors
+.vs/
+.nova/
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+nbproject/project.properties
+nbproject/project.xml
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+.env
+
+# Distribution CSS
+web/css/themes/
+
+# Distribution JS
+web/js/dist/
+
+# Composer
+composer.phar
+test/vendor/
+# PHPMailer
+web/inc/vendor/
+# Quick install
+web/src/vendor/
+.phpunit.result.cache
+
+# vitepress build output
+**/.vitepress/dist/
+**/.vitepress/cache/
+# Node
+**/node_modules/
+npm-debug.log
+
 # Dedicated private keys and local credentials must stay outside Git.
 github-hestia-diagnostico
 *.pem
@@ -7,3 +58,7 @@ id_rsa
 .env
 .env.*
 workflow-run-check.sh
+
+# Python development caches
+__pycache__/
+*.py[cod]

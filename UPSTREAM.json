@@ -1,0 +1,10 @@
+{
+  "upstream": "https://github.com/hestiacp/hestiacp",
+  "upstream_commit": "c14350f40c71b71f36e3945e42607d7d9c4980eb",
+  "release": "1.10.5",
+  "release_tag_commit": "7d617fd1c5fd3be86458c7f53a6dad4a444b0a82",
+  "overlay": "1.0.0",
+  "modified_at": "2026-10-15",
+  "license": "GPL-3.0",
+  "installed_on_user_vps": false
+}

@@ -1,0 +1,7 @@
+{
+  "repository": "sftp:backup@backup.example.invalid:/srv/backups/hestia",
+  "password_file": "/root/.config/hestia-professional/restic-password",
+  "keep_daily": 7,
+  "rpo_hours": 24,
+  "rto_minutes": 120
+}
