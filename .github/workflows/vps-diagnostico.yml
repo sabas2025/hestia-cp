@@ -1,0 +1,48 @@
+name: Diagnostico SSH da VPS
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: vps-diagnostico
+  cancel-in-progress: false
+
+jobs:
+  diagnostico:
+    if: github.repository == 'sabas2025/hestia-cp'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validar credenciais e executar diagnostico restrito
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          for variable in VPS_HOST VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            [[ -n ${!variable:-} ]] || { printf 'Secret ausente: %s\n' "$variable" >&2; exit 1; }
+          done
+          [[ $VPS_HOST =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]] || { printf 'VPS_HOST invalido\n' >&2; exit 1; }
+          ssh_dir=$(mktemp -d "$RUNNER_TEMP/hestia-ssh.XXXXXXXX")
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          unset VPS_SSH_KEY VPS_KNOWN_HOSTS
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          ssh-keygen -y -P '' -f "$ssh_dir/key" >/dev/null || { printf 'Chave SSH invalida ou protegida por senha\n' >&2; exit 1; }
+          ssh-keygen -F "$VPS_HOST" -f "$ssh_dir/known_hosts" >/dev/null || { printf 'Host ausente de VPS_KNOWN_HOSTS\n' >&2; exit 1; }
+          ssh -F /dev/null -p 22 -i "$ssh_dir/key" \
+            -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o PasswordAuthentication=no -o KbdInteractiveAuthentication=no \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null \
+            -o ForwardAgent=no -o ClearAllForwardings=yes \
+            -o ConnectTimeout=10 -o ConnectionAttempts=1 \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=2 \
+            "root@$VPS_HOST" /usr/local/sbin/hestia-github-diagnostico
