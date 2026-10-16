@@ -1,0 +1,9 @@
+# Dedicated private keys and local credentials must stay outside Git.
+github-hestia-diagnostico
+*.pem
+*.key
+id_ed25519
+id_rsa
+.env
+.env.*
+workflow-run-check.sh
