@@ -6,7 +6,20 @@
 
 <h1 align="center"><a href="https://www.hestiacp.com/">Hestia Control Panel</a></h1>
 
-![HestiaCP Web Interface screenshot](https://storage.hestiacp.com/hestiascreen.png)
+## Prévia da nova interface
+
+Capturas com dados ilustrativos, sem conexão com a VPS. Consulte [os detalhes dos prints](docs/screenshots/README.md).
+
+### Computador
+
+![Nova central HestiaCP — prévia para computador](docs/screenshots/dashboard-1440.png)
+
+<details>
+<summary>Ver versão para celular</summary>
+
+<img src="docs/screenshots/dashboard-360.png" alt="Nova central HestiaCP — prévia para celular" width="360">
+
+</details>
 
 <h2 align="center">Lightweight and powerful control panel for the modern web</h2>
 
