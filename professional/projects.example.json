@@ -1,0 +1,9 @@
+{
+  "projects": {
+    "hub-node": {"type": "node", "owner": "hubapp", "domain": "node.example.invalid", "port": 3100, "working_directory": "/home/hubapp/projects/hub-node", "entrypoint": "server.js", "node_binary": "/usr/bin/node", "environment_file": "/etc/hestiacp/professional/secrets/hub-node.env", "url": "https://node.example.invalid"},
+    "proxy-app": {"type": "proxy", "owner": "hubapp", "domain": "proxy.example.invalid", "port": 3200, "url": "https://proxy.example.invalid"},
+    "docker-admin": {"type": "docker-ui", "owner": "admin", "url": "https://docker.example.invalid"},
+    "editor-online": {"type": "editor", "owner": "hubapp", "url": "https://editor.example.invalid"},
+    "marketing": {"type": "marketing", "owner": "admin", "compose_file": "/etc/hestiacp/professional/projects/marketing.compose.json", "sha256": "SUBSTITUA_PELO_SHA256_DO_ARQUIVO_REVISADO", "url": "https://marketing.example.invalid"}
+  }
+}

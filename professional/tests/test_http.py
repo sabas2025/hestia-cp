@@ -24,6 +24,7 @@ class HttpTests(unittest.TestCase):
         cls.temporary=tempfile.TemporaryDirectory();cls.root=Path(cls.temporary.name)
         shutil.copytree(ROOT/'web/professional',cls.root/'web/professional')
         (cls.root/'web/inc').mkdir()
+        shutil.copytree(ROOT/'web/inc/2fa',cls.root/'web/inc/2fa')
         (cls.root/'web/inc/main.php').write_text('''<?php
 if (!isset($_SERVER['HTTP_X_TEST_USER'])) { header('Location: /login/'); exit; }
 $_SESSION=['user'=>$_SERVER['HTTP_X_TEST_USER'],'userContext'=>$_SERVER['HTTP_X_TEST_CONTEXT']??'user','look'=>'','ROOT_USER'=>'admin','VERSION'=>$_SERVER['HTTP_X_TEST_VERSION']??'1.10.5','APP_NAME'=>'Test'];
@@ -63,6 +64,11 @@ function get_user_data($name) { return [$name=>['ROLE'=>'user','SUSPENDED'=>'no'
         self.assertEqual(self.request(headers=self.user(**{'X-Test-Suspended':'yes'}))[0],403)
     def test_post_rejected_without_side_effects(self):
         status,headers,body=self.request(headers=self.user(),method='POST');self.assertEqual(status,405);self.assertEqual(headers['Allow'],'GET')
+    def test_mfa_helpers_are_not_http_oracles(self):
+        for name in ('secret.php', 'check.php', 'local-provider.php'):
+            with self.subTest(name=name):
+                status, headers, body = self.request('/inc/2fa/' + name + '?secret=SYNTHETIC&token=123456')
+                self.assertEqual(status, 403); self.assertEqual(body, '')
     def test_unreviewed_upgrade_is_explicitly_unavailable(self):
         self.assertEqual(self.request(headers=self.user(**{'X-Test-Version':'1.11.0'}))[0],503)
     def test_admin_snapshot_and_direct_template_guard(self):

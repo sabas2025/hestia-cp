@@ -1,8 +1,11 @@
-# Prints da interface
+# Prints da interface 1.1
 
-Capturas da prévia `professional/preview.html`, realizadas na revisão visual de 15/10/2026. Os dados são ilustrativos; nenhuma VPS estava conectada. As imagens não comprovam instalação, backup real ou estado de serviços.
+Capturas reais da página de prévia `professional/preview.html`, renderizada a partir do template PHP com fixtures explicitamente ilustrativas em 19/10/2026. Nenhuma VPS estava conectada. Não demonstram instalação de serviços, execução de backup remoto ou ativação de A2F em uma conta real.
 
-- `dashboard-1440.png`: tela de computador, largura de 1440 px.
-- `dashboard-360.png`: tela de celular, largura de 360 px.
+- `dashboard-1440.png`, `dashboard-768.png`, `dashboard-360.png`: visão completa em três larguras.
+- `platform-modules-1440.png`: editor, Docker, Compose, Node.js, marketing e proxy.
+- `a2f-1440.png`: configuração guiada de autenticação de dois fatores.
+- `assistant-config-1440.png`: formulário do assistente local.
+- `assistant-*.png`: teste do roteiro de DNS/e-mail, com valores de demonstração.
 
-A prévia usa o layout e os estilos da nova central. A página autenticada fica em `/professional/` após aplicação e homologação em um servidor Hestia compatível.
+Os estados de configuração pendente são intencionais. A suíte testou busca, estado vazio, ausência de overflow e de erros JS, geração local do roteiro, recusa de IP privado e ausência de requisições de rede pelo assistente.

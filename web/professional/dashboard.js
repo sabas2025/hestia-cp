@@ -58,5 +58,52 @@
     }
   }
   $('pro-refresh')?.addEventListener('click', refresh);
+  let assistantPlan = null;
+  $('pro-assistant-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const topic = $('pro-assistant-topic').value;
+    const name = $('pro-assistant-domain').value.trim().toLowerCase().replace(/\.$/, '');
+    const address = $('pro-assistant-ip').value.trim();
+    const octets = address.split('.');
+    const validIP = octets.length === 4 && octets.every(x => /^(0|[1-9][0-9]{0,2})$/.test(x) && +x <= 255) &&
+      ![0, 10, 127].includes(+octets[0]) && +octets[0] < 224 &&
+      !(+octets[0] === 192 && +octets[1] === 168) && !(+octets[0] === 172 && +octets[1] >= 16 && +octets[1] <= 31) &&
+      !(+octets[0] === 169 && +octets[1] === 254) && !(+octets[0] === 100 && +octets[1] >= 64 && +octets[1] <= 127);
+    if (name.length > 253 || !name.includes('.') || !name.split('.').every(s => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(s)) || !/[a-z]/.test(name) || !validIP) {
+      $('pro-assistant-message').textContent = 'Informe um domínio válido e o IPv4 público da VPS.';
+      $('pro-assistant-result').hidden = true; assistantPlan = null; return;
+    }
+    const steps = ['Confirme o IP e o provedor que hospeda a zona DNS.', 'Revise os registros existentes antes de publicar alterações.'];
+    const records = [{type: 'A', name, value: address}];
+    if (topic === 'email') {
+      records.push({type: 'A', name: `mail.${name}`, value: address}, {type: 'MX', name, value: `10 mail.${name}`},
+        {type: 'TXT', name, value: `v=spf1 ip4:${address} ~all`}, {type: 'TXT', name: `_dmarc.${name}`, value: 'v=DMARC1; p=none'});
+      steps.push('O SPF sugerido autoriza apenas este IP. Mescle seus remetentes em um único SPF; preserve as integrações existentes.',
+        'Ative DKIM no Hestia e copie a chave pública real do domínio.', `Peça ao provedor da VPS o PTR do IP para mail.${name}.`,
+        'Valide TLS, SMTP autenticado, envio e recebimento. DMARC começa em observação; avance após conferir os remetentes.');
+    } else if (topic === 'backup') steps.push('Ative o backup nativo local para cobrir sites e dumps dos bancos.',
+      'Configure os destinos em cloud-backup.json e credenciais root/0600 pelo terminal administrativo.',
+      'Execute plan, init, run, check e drill; guarde a senha de criptografia fora da VPS.',
+      'Ensaie importação SQL e restauração da aplicação em homologação.');
+    else if (topic === 'server') steps.push('Confirme hostname, certificado, atualizações, usuário de aplicação e 2FA.',
+      'Use uma VPS limpa para instalar o Hestia; migre aplicações e bancos antes de alterar o DNS.');
+    else if (topic === 'security') steps.push('Comece o WAF em observação e valide login, APIs, OAuth e uploads.',
+      'Avance PL1 → PL2 → PL3 com revisão de falsos positivos por regra e rota.',
+      'Cadastre seu IP no Fail2Ban e mantenha console e rollback disponíveis.',
+      'Rotas de proxy direto para Node.js/Docker precisam de WAF próprio.');
+    assistantPlan = {schema: 1, assistant: 'local-guided-rules', mode: 'plan', topic, domain: name,
+      records: ['dns', 'email'].includes(topic) ? records : [], steps, changes_applied: false, dkim_generated: false};
+    $('pro-assistant-steps').replaceChildren(...steps.map(text => { const li = document.createElement('li'); li.textContent = text; return li; }));
+    $('pro-assistant-records').textContent = assistantPlan.records.map(r => `${r.type}  ${r.name}  ${r.value}`).join('\n');
+    $('pro-assistant-records').hidden = assistantPlan.records.length === 0;
+    $('pro-assistant-result').hidden = false;
+    $('pro-assistant-message').textContent = 'Roteiro gerado localmente. Nenhuma alteração foi aplicada.';
+  });
+  $('pro-assistant-download')?.addEventListener('click', () => {
+    if (!assistantPlan) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify(assistantPlan, null, 2)], {type: 'application/json'}));
+    const link = document.createElement('a'); link.href = url; link.download = 'plano-configuracao.json'; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
   // No automatic repeated expensive CLI queries; refresh only on explicit request.
 })();

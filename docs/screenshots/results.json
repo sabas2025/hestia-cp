@@ -1,0 +1,23 @@
+[
+  {
+    "viewport": 360,
+    "horizontal_overflow": false,
+    "search": "passed",
+    "empty_state": "passed",
+    "js_errors": 0
+  },
+  {
+    "viewport": 768,
+    "horizontal_overflow": false,
+    "search": "passed",
+    "empty_state": "passed",
+    "js_errors": 0
+  },
+  {
+    "viewport": 1440,
+    "horizontal_overflow": false,
+    "search": "passed",
+    "empty_state": "passed",
+    "js_errors": 0
+  }
+]

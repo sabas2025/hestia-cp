@@ -1,0 +1,7 @@
+{
+  "profile": "observacao",
+  "waf": true,
+  "fail2ban": true,
+  "admin_cidrs": ["192.0.2.10/32"],
+  "request_body_limit": 134217728
+}

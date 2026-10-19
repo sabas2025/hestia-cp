@@ -1,0 +1,166 @@
+{
+  "generated_at": "2026-10-19T03:26:56.137915+00:00",
+  "installer_executed": false,
+  "vps_accessed": false,
+  "checks": [
+    {
+      "name": "bash -n hst-install.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-common.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-debian.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-ubuntu.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/model.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/professional/model.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/index.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/professional/index.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/view.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/professional/view.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/inc/2fa/local-provider.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/inc/2fa/local-provider.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/inc/2fa/check.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/inc/2fa/check.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/inc/2fa/secret.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/hestia-professional/web/inc/2fa/secret.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP authorization and data-scoping assertions",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\n    \"checks\": 32,\n    \"status\": \"passed\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP test runtime",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)\nCopyright (c) The PHP Group\nZend Engine v4.3.6, Copyright (c) Zend Technologies\n",
+      "stderr": ""
+    },
+    {
+      "name": "ShellCheck new shared code",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "ShellCheck installer error-level findings",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "JavaScript syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Node project example syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-add-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-check-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Python syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Browser desktop and mobile",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\n  \"status\": \"passed\",\n  \"viewports\": 3,\n  \"reports\": [\n    {\n      \"viewport\": 360,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 768,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 1440,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    }\n  ]\n}\n",
+      "stderr": ""
+    }
+  ],
+  "python": {
+    "tests": 64,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "php_runtime": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)",
+  "status": "passed",
+  "additional_validation": {
+    "fail2ban": {
+      "version": "1.1.0",
+      "parser": "real",
+      "native_hestia_config_with_override": "passed",
+      "services_started": false,
+      "firewall_actions_executed": false
+    },
+    "totp_library_commit": "85408c4e775dba7c0802f2d928efd921d530bc5b",
+    "qr_generated_without_external_service": true
+  }
+}

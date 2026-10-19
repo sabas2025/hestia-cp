@@ -108,14 +108,23 @@ def apply_files(root, source, refresh=False):
             return {"status": "review-required", "version": live, "core_overwritten": False}
         raise ValueError("Review required for this Hestia version")
     manifest = []
+    mfa_contract = json.loads((source / 'professional/mfa-contract.json').read_text())
+    # Never overwrite a local MFA hotfix just because the Hestia version string is unchanged.
+    for relative, original_hash in mfa_contract.items():
+        live_path = root / relative
+        expected = source / relative
+        if live_path.is_file() and live_path.read_bytes() != expected.read_bytes() and hashlib.sha256(live_path.read_bytes()).hexdigest() != original_hash:
+            raise ValueError('MFA contract changed; review local authentication modifications')
     files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
+    files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
+    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa')]
     files += [source / "web/css/themes/custom/professional.css"]
     files += [p for p in (source / "professional").glob("*") if p.suffix in (".py", ".service", ".timer", ".json") and p.is_file() and p.name != 'deployment.json']
     for file in files:
         destination = root / file.relative_to(source)
         # During a refresh source==root, files already live in place.
         if file.resolve() != destination.resolve():
-            atomic_file(destination, file.read_bytes(), 0o755 if file.suffix == ".py" else 0o644)
+            atomic_file(destination, file.read_bytes(), 0o755 if file.suffix == ".py" or file.parent.name == 'bin' else 0o644)
         manifest.append({"file": str(destination.relative_to(root)), "sha256": hashlib.sha256(file.read_bytes()).hexdigest()})
     common = source / "install/hst-common.sh"
     asset_lock = source / "install/assets.lock.tsv"
@@ -135,7 +144,7 @@ def apply_files(root, source, refresh=False):
     if link not in text:
         # Add a link without replacing upstream HTML, authorization or scripts.
         atomic_file(panel, (link + text).encode())
-    atomic_file(root / "professional/deployment.json", json.dumps({"overlay": "1.0.0", "hestia": VERSION, "files": manifest}, indent=2).encode(), 0o600)
+    atomic_file(root / "professional/deployment.json", json.dumps({"overlay": "1.1.0", "hestia": VERSION, "files": manifest}, indent=2).encode(), 0o600)
     return {"status": "applied", "version": VERSION, "files": len(manifest)}
 
 def enable_services(root):
@@ -158,7 +167,7 @@ fi
 exit "$status"
 '''
     atomic_file(hook, wrapper.encode(), 0o750)
-    for name in ("hestia-professional-health.service", "hestia-professional-health.timer", "hestia-professional-backup@.service", "hestia-professional-backup@.timer"):
+    for name in ("hestia-professional-health.service", "hestia-professional-health.timer", "hestia-professional-backup@.service", "hestia-professional-backup@.timer", "hestia-professional-cloud-backup@.service", "hestia-professional-cloud-backup@.timer"):
         atomic_file(Path("/etc/systemd/system") / name, (root / "professional" / name).read_bytes())
     subprocess.run(["systemctl", "daemon-reload"], check=True)
     subprocess.run(["systemctl", "enable", "--now", "hestia-professional-health.timer"], check=True)

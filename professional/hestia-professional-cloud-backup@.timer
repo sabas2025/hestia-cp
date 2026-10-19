@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily multicloud Hestia backup for %i
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=20m
+Persistent=true
+Unit=hestia-professional-cloud-backup@%i.service
+
+[Install]
+WantedBy=timers.target

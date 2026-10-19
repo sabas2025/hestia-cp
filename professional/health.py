@@ -9,6 +9,7 @@ import shutil
 import ssl
 import sys
 from ops import atomic_json, command, config, require_root, utcnow
+import security
 
 def collect(root=Path("/usr/local/hestia"), runner=command):
     conf = config(root / "conf/hestia.conf")
@@ -60,6 +61,21 @@ def collect(root=Path("/usr/local/hestia"), runner=command):
             check("Certificado do painel", "critical", "Não foi possível validar o certificado")
     else:
         check("Certificado do painel", "critical", "Certificado ausente")
+    # The command runner contract for health reports returns a status/output tuple.
+    def security_runner(args):
+        code, output = runner(args, timeout=15)
+        if code: raise RuntimeError('Security collector failed')
+        return output
+    data['protection'] = security.collect(root, security_runner)
+    admins = [config(p) for p in (root / 'data/users').glob('*/user.conf') if not p.is_symlink()]
+    admins = [a for a in admins if a.get('ROLE') == 'admin' and a.get('SUSPENDED') == 'no']
+    missing_twofa = sum(not a.get('TWOFA') for a in admins)
+    data['twofa_admins'] = {'active': len(admins), 'without_twofa': missing_twofa}
+    check('A2F dos administradores', 'warning' if missing_twofa or not admins else 'ok',
+          f'{missing_twofa} de {len(admins)} administradores sem A2F' if admins else 'Sem inventário de administradores')
+    for key, title in [('waf', 'Módulo WAF'), ('fail2ban', 'Fail2Ban')]:
+        available = data['protection'][key] == 'available'
+        check(title, 'ok' if available else 'warning', 'Disponível; revise política efetiva' if available else 'Sem confirmação de funcionamento')
     data["status"] = "critical" if any(c["state"] == "critical" for c in data["checks"]) else "warning" if any(c["state"] == "warning" for c in data["checks"]) else "ok"
     return data
 

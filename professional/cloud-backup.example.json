@@ -1,0 +1,12 @@
+{
+  "schema": 2,
+  "rpo_hours": 24,
+  "rto_minutes": 120,
+  "keep_daily": 7,
+  "keep_weekly": 4,
+  "keep_monthly": 6,
+  "targets": [
+    {"id": "drive-principal", "provider": "google-drive", "remote": "drivebackup", "path": "hestia/restic", "password_file": "/etc/hestiacp/professional/secrets/drive-password", "rclone_config": "/etc/hestiacp/professional/secrets/drive.conf"},
+    {"id": "amazon-secundario", "provider": "amazon-s3", "remote": "amazonbackup", "path": "SEU-BUCKET/hestia/restic", "password_file": "/etc/hestiacp/professional/secrets/amazon-password", "rclone_config": "/etc/hestiacp/professional/secrets/amazon.conf"}
+  ]
+}

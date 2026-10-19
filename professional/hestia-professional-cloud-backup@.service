@@ -1,0 +1,17 @@
+[Unit]
+Description=Multicloud encrypted site and database backup for %i
+After=hestia.service network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/hestiacp/professional/cloud-backup.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/hestia/professional/cloud_backup.py run --user %i --config /etc/hestiacp/professional/cloud-backup.json --apply
+User=root
+Group=root
+UMask=0077
+PrivateTmp=true
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=24h

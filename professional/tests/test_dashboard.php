@@ -69,6 +69,19 @@ expect(pro_snapshot($root . '/malformed.json') === null, 'Corrupt snapshot');
 symlink($root . '/malformed.json', $root . '/symlink.json');
 expect(pro_snapshot($root . '/symlink.json') === null, 'Symlink snapshot rejected');
 expect(pro_escape('<script>"&') === '&lt;script&gt;&quot;&amp;', 'HTML escaped');
+file_put_contents($root . '/data/professional/projects.json', json_encode(['projects' => [
+    ['id' => 'my-node', 'type' => 'node', 'owner' => 'clientone', 'url' => 'https://node.example.org'],
+    ['id' => 'other-node', 'type' => 'node', 'owner' => 'clienttwo', 'url' => 'https://private.example.org'],
+    ['id' => 'docker-admin', 'type' => 'docker-ui', 'owner' => 'clientone', 'url' => 'https://docker.example.org'],
+    ['id' => 'bad-script', 'type' => 'editor', 'owner' => 'clientone', 'url' => 'javascript:alert(1)'],
+    ['id' => 'token-link', 'type' => 'editor', 'owner' => 'clientone', 'url' => 'https://editor.example.org/?token=SECRET'],
+]]));
+$clientProjects = pro_payload($identity, $account, $root, $runner)['projects'];
+expect(count($clientProjects) === 1 && $clientProjects[0]['id'] === 'my-node', 'Client project isolation and unsafe URLs blocked');
+$lookProjects = pro_payload($impersonated, $account, $root, $runner)['projects'];
+expect(count($lookProjects) === 1 && $lookProjects[0]['id'] === 'other-node', 'Impersonation has no global Docker access');
+file_put_contents($root . '/data/professional/backups/clientone-forged-run.json', json_encode(['user' => 'clienttwo', 'id' => 'other', 'provider' => 'private']));
+expect(pro_payload($identity, $account, $root, $runner)['cloud_targets'] === [], 'Wrong-owner cloud snapshot rejected');
 $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($iterator as $file) { $file->isDir() && !$file->isLink() ? rmdir($file->getPathname()) : unlink($file->getPathname()); }
 rmdir($root);

@@ -27,7 +27,7 @@ def main():
     for path in [ROOT/'install'/name for name in ['hst-install.sh','hst-common.sh','hst-install-debian.sh','hst-install-ubuntu.sh']]:run('bash -n '+path.name,['bash','-n',str(path)])
     php=os.environ.get('PHP_BINARY') or shutil.which('php')
     if php:
-        for path in (ROOT/'web/professional').glob('*.php'):run('PHP lint '+path.name,[php,'-n','-l',str(path)])
+        for path in [*(ROOT/'web/professional').glob('*.php'), *(ROOT/'web/inc/2fa').glob('*.php')]:run('PHP lint '+str(path.relative_to(ROOT)),[php,'-n','-l',str(path)])
         run('PHP authorization and data-scoping assertions',[php,'-n',str(ROOT/'professional/tests/test_dashboard.php')])
         result['php_runtime']=run('PHP test runtime',[php,'--version']).stdout.splitlines()[0]
     else:result['checks'].append({'name':'PHP tests','status':'unavailable'})
@@ -37,6 +37,9 @@ def main():
         run('ShellCheck installer error-level findings',[shellcheck,'--severity=error','-e','SC1091,SC2034',str(ROOT/'install/hst-install-debian.sh'),str(ROOT/'install/hst-install-ubuntu.sh')])
     node=shutil.which('node')
     if node:run('JavaScript syntax',[node,'--check',str(ROOT/'web/professional/dashboard.js')])
+    if node:run('Node project example syntax',[node,'--check',str(ROOT/'professional/node-server.example.mjs')])
+    for name in ('v-add-user-2fa', 'v-check-user-2fa'):run('Bash MFA syntax '+name,['bash','-n',str(ROOT/'bin'/name)])
+    run('Python syntax',[sys.executable,'-m','compileall','-q',str(ROOT/'professional')])
     if node and os.environ.get('PLAYWRIGHT_MODULE') and os.environ.get('CHROME_BIN'):
         run('Browser desktop and mobile',[node,str(ROOT/'professional/tests/test_visual.cjs')])
     result['status']='passed' if outcome.wasSuccessful() and all(c['status']=='passed' for c in result['checks']) else 'incomplete-or-failed'

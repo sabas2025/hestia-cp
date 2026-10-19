@@ -4,7 +4,7 @@ require __DIR__ . '/../../web/professional/model.php';
 define('HST_PRO_VIEW', true);
 $displayName = 'Hestia Professional';
 $identity = ['owner' => 'admin', 'admin' => true, 'impersonating' => false];
-$payload = ['resources' => [], 'twofa' => false, 'disk' => '1.240', 'disk_limit' => 'unlimited', 'last_backup' => null, 'last_drill' => null, 'job' => null,
+$payload = ['resources' => [], 'file_manager' => true, 'twofa' => false, 'disk' => '1.240', 'disk_limit' => 'unlimited', 'last_backup' => null, 'last_drill' => null, 'job' => null,
   'health' => ['status' => 'ok', 'generated_at' => 'Dados ilustrativos para revisão visual', 'checks' => [
     ['name' => 'Disco', 'state' => 'ok', 'detail' => '28% utilizado'],
     ['name' => 'Nginx', 'state' => 'ok', 'detail' => 'Ativo'],

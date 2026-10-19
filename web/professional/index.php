@@ -20,6 +20,7 @@ try {
     $account = get_user_data($identity['owner'])[$identity['owner']] ?? [];
     if (($account['SUSPENDED'] ?? 'yes') !== 'no') { throw new RuntimeException('Suspended account'); }
     $payload = pro_payload($identity, $account, dirname(__DIR__, 2));
+    $payload['file_manager'] = ($_SESSION['FILE_MANAGER'] ?? '') === 'true';
 } catch (Throwable $error) {
     http_response_code(403); exit('Acesso não autorizado.');
 }

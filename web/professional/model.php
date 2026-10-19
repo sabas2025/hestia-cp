@@ -105,7 +105,24 @@ function pro_payload(array $identity, array $account, string $root, ?callable $r
         $rpo = (int)($lastBackup['rpo_hours'] ?? 24);
         $backupState = $completed !== false && $completed <= time() + 300 && time() - $completed <= max(1, $rpo) * 3600 ? 'Dentro do prazo configurado' : 'Cópia fora do prazo: revisar agendamento';
     }
-    return ['identity' => $identity, 'resources' => $resources,
+    $catalog = pro_snapshot($root . '/data/professional/projects.json');
+    $projects = [];
+    foreach (($catalog['projects'] ?? []) as $project) {
+        if (!is_array($project) || !preg_match('/\A[a-z][a-z0-9-]{1,31}\z/D', $project['id'] ?? '')) { continue; }
+        if (!$identity['admin'] && (($project['owner'] ?? '') !== $owner || in_array($project['type'] ?? '', ['docker-ui', 'marketing'], true))) { continue; }
+        $url = $project['url'] ?? '';
+        $parts = is_string($url) ? parse_url($url) : false;
+        if (!is_array($parts) || ($parts['scheme'] ?? '') !== 'https' || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) { continue; }
+        $projects[] = ['id' => $project['id'], 'type' => (string)($project['type'] ?? ''), 'url' => $url];
+    }
+    $cloud = [];
+    foreach (glob($root . '/data/professional/backups/' . $owner . '-*-run.json') ?: [] as $file) {
+        $entry = pro_snapshot($file);
+        if ($entry === null || ($entry['user'] ?? '') !== $owner) { continue; }
+        $cloud[] = ['id' => (string)($entry['id'] ?? ''), 'provider' => (string)($entry['provider'] ?? ''),
+                    'state' => (string)($entry['state'] ?? ''), 'completed_at' => (string)($entry['completed_at'] ?? '')];
+    }
+    return ['identity' => $identity, 'resources' => $resources, 'projects' => $projects, 'cloud_targets' => $cloud,
         'twofa' => !empty($account['TWOFA']),
         'disk' => (string)($account['U_DISK'] ?? '0'),
         'disk_limit' => (string)($account['DISK_QUOTA'] ?? 'unknown'),

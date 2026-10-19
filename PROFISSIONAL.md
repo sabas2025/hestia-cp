@@ -1,3 +1,5 @@
+> Atualização 1.1.0 (19/10/2026): consulte [AUDITORIA-1.1.md](AUDITORIA-1.1.md), [BACKUPS-NUVEM.md](BACKUPS-NUVEM.md), [SEGURANCA-A2F-WAF.md](SEGURANCA-A2F-WAF.md) e [PROJETOS-PLATAFORMA.md](PROJETOS-PLATAFORMA.md). O restante deste guia registra a base 1.0. Antes de aplicar em um Hestia existente, instale `python3-qrcode` pelo APT: a camada 1.1 também substitui os helpers nativos de A2F por geração local, sob contrato de hashes. Docker, WAF e backups não são ativados automaticamente.
+
 # HestiaCP Professional 1.0.0 — guia de uso
 
 Modificações locais de 15/10/2026 sobre HestiaCP 1.10.5, revisão `c14350f40c71b71f36e3945e42607d7d9c4980eb`. Este é um pacote modificado, independente da release oficial. A licença GPL-3.0 e a atribuição original foram preservadas.

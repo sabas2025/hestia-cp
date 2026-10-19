@@ -10,13 +10,13 @@ import subprocess
 import sys
 import tempfile
 import time
-from ops import atomic_json, config, lock, require_root, username, utcnow
+from ops import atomic_json, config, lock, private_read, require_root, username, utcnow
 
 def settings(path):
     stat = path.stat()
     if path.is_symlink() or stat.st_uid != 0 or stat.st_mode & 0o077:
         raise ValueError("Backup configuration must be a root-owned regular file with mode 0600")
-    result = json.loads(path.read_text())
+    result = json.loads(private_read(path))
     allowed = {"repository", "password_file", "keep_daily", "rpo_hours", "rto_minutes"}
     if set(result) - allowed:
         raise ValueError("Unknown backup configuration key")
@@ -25,6 +25,8 @@ def settings(path):
         raise ValueError("Use an absolute path or sftp:, s3:, rclone: repository")
     if re.search(r"https?://[^/@\s]+:[^/@\s]+@", repository):
         raise ValueError("Do not embed passwords in repository URLs")
+    if repository.startswith('s3:http://'):
+        raise ValueError('S3 requires TLS; use the reviewed multicloud configuration')
     if repository.startswith('/') and any(part in ('public', 'public_html') for part in Path(repository).parts):
         raise ValueError('Backup repository must be outside web-public directories')
     password = Path(result.get("password_file", ""))
@@ -33,6 +35,7 @@ def settings(path):
     st = password.stat()
     if st.st_uid != 0 or st.st_mode & 0o077 or st.st_size == 0:
         raise ValueError("Password file must be non-empty, root-owned and mode 0600")
+    private_read(password)
     for key, default in (("keep_daily", 7), ("rpo_hours", 24), ("rto_minutes", 120)):
         value = result.get(key, default)
         if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= 3650:

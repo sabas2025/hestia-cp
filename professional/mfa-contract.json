@@ -1,0 +1,6 @@
+{
+  "web/inc/2fa/secret.php": "6c84c6b86d0be98ebb86e4797501bbe6dee3fe600175b21df25ceb3b155b2564",
+  "web/inc/2fa/check.php": "26e0de1372db8ad2b1b9bb200b5648d0e9651b8c23a539b45a8471baf33d77f9",
+  "bin/v-add-user-2fa": "1ca297888943a8fa4d17a199e574071272720de63b383510abed75f04346cec6",
+  "bin/v-check-user-2fa": "1dd5fdf34d5d57c9a182f07c398bcb65e24af8a6763aa5c9baf405b642cdc9b0"
+}
