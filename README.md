@@ -16,6 +16,8 @@ Guias: [auditoria e pendências](AUDITORIA-1.1.md) · [backup em nuvem](BACKUPS-
 
 **Estado:** código e testes locais; nenhum desses serviços foi ativado na VPS do proprietário. Integrações externas exigem instalação, credenciais, autenticação e homologação. Os cartões da central informam essa necessidade e não simulam serviços instalados.
 
+**Verificação posterior de 19/10/2026:** a [auditoria dos pedidos e da revisão publicada](AUDITORIA-VERIFICACAO-2026-10-19.md) confirma as entregas e identifica pendências em A2F, revalidação no refresh e estado efetivo do WAF. Os recursos empresariais adicionais ainda não constituem uma entrega completa. Consulte o relatório antes de implantar.
+
 ![Módulos da central — prévia ilustrativa](docs/screenshots/platform-modules-1440.png)
 
 <h1 align="center"><a href="https://www.hestiacp.com/">Hestia Control Panel</a></h1>

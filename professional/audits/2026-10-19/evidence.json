@@ -1,0 +1,534 @@
+{
+  "audit_date": "2026-10-19",
+  "functional_revision": "56c2cbea1e16e97b77aeb31fa4ee11fe2d093ef4",
+  "functional_tree": "9f489dcd583b065929d5611f9585bee68297fd6c",
+  "remote_integrity": {
+    "blobs_and_modes_compared": 1630,
+    "all_match": true,
+    "tree_truncated": false
+  },
+  "vps_accessed": false,
+  "production_services_changed": false,
+  "functional_fixes_applied_by_audit": false,
+  "runtime": {
+    "python": "3.12.14",
+    "php": "8.3.6",
+    "qrcode_test_dependency": "8.2",
+    "totp_library_commit": "85408c4e775dba7c0802f2d928efd921d530bc5b"
+  },
+  "initial_dependency_failure": {
+    "generated_at": "2026-10-19T17:13:49.385944+00:00",
+    "installer_executed": false,
+    "vps_accessed": false,
+    "checks": [
+      {
+        "name": "bash -n hst-install.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-common.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-install-debian.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-install-ubuntu.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/model.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/model.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/index.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/index.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/view.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/view.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/secret.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/secret.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/local-provider.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/local-provider.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/check.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/check.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP authorization and data-scoping assertions",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "{\n    \"checks\": 32,\n    \"status\": \"passed\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP test runtime",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)\nCopyright (c) The PHP Group\nZend Engine v4.3.6, Copyright (c) Zend Technologies\n",
+        "stderr": ""
+      },
+      {
+        "name": "ShellCheck new shared code",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "ShellCheck installer error-level findings",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "JavaScript syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Node project example syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Bash MFA syntax v-add-user-2fa",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Bash MFA syntax v-check-user-2fa",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Python syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Browser desktop and mobile",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "{\n  \"status\": \"passed\",\n  \"viewports\": 3,\n  \"reports\": [\n    {\n      \"viewport\": 360,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 768,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 1440,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    }\n  ]\n}\n",
+        "stderr": ""
+      }
+    ],
+    "python": {
+      "tests": 64,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    "php_runtime": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)",
+    "status": "incomplete-or-failed"
+  },
+  "complete_run": {
+    "generated_at": "2026-10-19T17:14:53.583152+00:00",
+    "installer_executed": false,
+    "vps_accessed": false,
+    "checks": [
+      {
+        "name": "bash -n hst-install.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-common.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-install-debian.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-install-ubuntu.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/model.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/model.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/index.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/index.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/view.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/view.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/secret.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/secret.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/local-provider.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/local-provider.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/check.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/check.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP authorization and data-scoping assertions",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "{\n    \"checks\": 32,\n    \"status\": \"passed\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP test runtime",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)\nCopyright (c) The PHP Group\nZend Engine v4.3.6, Copyright (c) Zend Technologies\n",
+        "stderr": ""
+      },
+      {
+        "name": "ShellCheck new shared code",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "ShellCheck installer error-level findings",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "JavaScript syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Node project example syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Bash MFA syntax v-add-user-2fa",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Bash MFA syntax v-check-user-2fa",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Python syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Browser desktop and mobile",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "{\n  \"status\": \"passed\",\n  \"viewports\": 3,\n  \"reports\": [\n    {\n      \"viewport\": 360,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 768,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 1440,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    }\n  ]\n}\n",
+        "stderr": ""
+      }
+    ],
+    "python": {
+      "tests": 64,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "php_runtime": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)",
+    "status": "passed"
+  },
+  "runner_without_optional_tools": {
+    "generated_at": "2026-10-19T17:16:38.267944+00:00",
+    "installer_executed": false,
+    "vps_accessed": false,
+    "checks": [
+      {
+        "name": "bash -n hst-install.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-common.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-install-debian.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "bash -n hst-install-ubuntu.sh",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/model.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/model.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/index.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/index.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/professional/view.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/professional/view.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/secret.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/secret.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/local-provider.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/local-provider.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP lint web/inc/2fa/check.php",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe/web/inc/2fa/check.php\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP authorization and data-scoping assertions",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "{\n    \"checks\": 32,\n    \"status\": \"passed\"\n}\n",
+        "stderr": ""
+      },
+      {
+        "name": "PHP test runtime",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)\nCopyright (c) The PHP Group\nZend Engine v4.3.6, Copyright (c) Zend Technologies\n",
+        "stderr": ""
+      },
+      {
+        "name": "ShellCheck new shared code",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "ShellCheck installer error-level findings",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "JavaScript syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Node project example syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Bash MFA syntax v-add-user-2fa",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Bash MFA syntax v-check-user-2fa",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      },
+      {
+        "name": "Python syntax",
+        "status": "passed",
+        "exit": 0,
+        "stdout": "",
+        "stderr": ""
+      }
+    ],
+    "python": {
+      "tests": 64,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 2
+    },
+    "php_runtime": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)",
+    "status": "passed"
+  },
+  "static": {
+    "php_checked": 325,
+    "bash_checked": 678,
+    "syntax_failures": [],
+    "checksums_checked": 1629,
+    "checksum_failures": []
+  },
+  "reproductions": {
+    "source": "/workspace/scratch/23a2fd9c3f6d/audit-published-56c2cbe",
+    "vps_accessed": false,
+    "production_services_changed": false,
+    "csrf_links": [
+      {
+        "url": "/edit/user/?user=admin",
+        "native_csrf_accepts": false
+      },
+      {
+        "url": "/edit/user/?user=admin",
+        "native_csrf_accepts": false
+      },
+      {
+        "url": "/edit/user/?user=admin",
+        "native_csrf_accepts": false
+      }
+    ],
+    "waf_selection_vs_effective_state": {
+      "snapshot_waf": false,
+      "managed_rule_engine_still_on": true,
+      "service_commands_simulated": true
+    },
+    "backup_latest_attempt_vs_last_success": {
+      "latest_job_state": "failed",
+      "target_snapshot_state": "succeeded",
+      "target_snapshot_retains_last_success": true,
+      "cloud_commands_simulated": true
+    },
+    "refresh_source_equals_destination": {
+      "same_version_package_replacement_simulated": true,
+      "refresh_status": "applied",
+      "modified_mfa_file_retained": true,
+      "real_package_upgrade_performed": false
+    },
+    "native_resources": {
+      "command_exists": true,
+      "package_gui_exists": true,
+      "memory_high_without_memory_max": true,
+      "runtime_enforcement_tested": false
+    },
+    "native_dns_cluster_exists": true
+  },
+  "fail2ban": {
+    "version": "1.1.0",
+    "real_config_parser": true,
+    "native_hestia_plus_override": "passed",
+    "daemon_started": false,
+    "firewall_actions_executed": false
+  }
+}
