@@ -9,3 +9,7 @@ Capturas reais da página de prévia `professional/preview.html`, renderizada a 
 - `assistant-*.png`: teste do roteiro de DNS/e-mail, com valores de demonstração.
 
 Os estados de configuração pendente são intencionais. A suíte testou busca, estado vazio, ausência de overflow e de erros JS, geração local do roteiro, recusa de IP privado e ausência de requisições de rede pelo assistente.
+
+## Correções 1.1.1
+
+A pasta `1.1.1` contém novas capturas do dashboard e da configuração A2F, nas larguras 360 e 1440 px. São capturas reais dos templates de prévia com dados ilustrativos; nenhuma VPS conectada, nenhum fator ativado. O editor legado aparece em revisão, sem atalho habilitado.

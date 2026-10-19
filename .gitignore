@@ -62,3 +62,4 @@ workflow-run-check.sh
 # Python development caches
 __pycache__/
 *.py[cod]
+.qa/

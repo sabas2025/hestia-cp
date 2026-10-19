@@ -1,13 +1,27 @@
 {
-  "overlay_version": "1.0.0",
-  "reviewed_at": "2026-10-15",
+  "overlay_version": "1.1.1",
+  "reviewed_at": "2026-10-19",
   "review_before": "2026-12-01",
-  "hestia_supported": ["1.10.5"],
+  "hestia_supported": [
+    "1.10.5"
+  ],
   "php_default": "8.4",
-  "php_allowlist": ["8.2", "8.3", "8.4", "8.5"],
+  "php_allowlist": [
+    "8.2",
+    "8.3",
+    "8.4",
+    "8.5"
+  ],
   "php_support_source": "https://www.php.net/supported-versions.php",
   "apt_updates": "Authenticated vendor repositories, normal security updates retained",
   "external_archives": "Exact SHA-256 from install/assets.lock.tsv; changes fail closed",
   "runtime_overlay": "Review on version change; never replace a new official core with an old full file",
-  "rollback": "Provider snapshot and tested application backup; no automatic package rollback"
+  "rollback": "Provider snapshot and tested application backup; no automatic package rollback",
+  "optional_components": {
+    "filemanager": {
+      "approved": false,
+      "reason": "Legacy Flysystem 1.x requires remediation and a reviewed build before activation",
+      "alternative": "reviewed code-server integration"
+    }
+  }
 }

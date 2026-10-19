@@ -108,7 +108,7 @@ hst_os_detect() {
 
 hst_preflight() {
     local root=${1:-/} failed=0 p state
-    printf 'HestiaCP Professional 1.0 — inspection only\n'
+    printf 'HestiaCP Professional — inspection only (release: professional/component-policy.json)\n'
     if hst_os_detect "${root%/}/etc/os-release"; then
         printf 'OS: %s %s\n' "$HST_OS" "$HST_RELEASE"
     else printf 'BLOCK: unsupported OS\n'; failed=1; fi

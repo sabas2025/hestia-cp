@@ -1,3 +1,5 @@
+> **Operação atual 1.1.1:** leia [CORRECOES-1.1.1.md](CORRECOES-1.1.1.md) antes de usar os procedimentos abaixo. A2F, estados WAF, drill histórico e disponibilidade do File Manager foram alterados. O texto 1.0/1.1 abaixo permanece como referência histórica onde houver diferença.
+
 # A2F, WAF e Fail2Ban — operação 1.1
 
 Esta entrega adiciona controles ao código. Nenhuma proteção foi ativada na VPS do proprietário durante o desenvolvimento.

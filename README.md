@@ -1,24 +1,28 @@
-> Pacote modificado HestiaCP Professional 1.1.0 (19/10/2026), baseado na revisão registrada em [UPSTREAM.json](UPSTREAM.json). Comece por [PROFISSIONAL.md](PROFISSIONAL.md) e consulte [ENTREGA.md](ENTREGA.md) para alterações, testes e limites. Não é uma release oficial do HestiaCP.
+> Pacote modificado HestiaCP Professional 1.1.1 (19/10/2026), baseado na revisão registrada em [UPSTREAM.json](UPSTREAM.json). Comece por [PROFISSIONAL.md](PROFISSIONAL.md) e consulte [ENTREGA.md](ENTREGA.md) para alterações, testes e limites. Não é uma release oficial do HestiaCP.
 >
 > Para conexão de diagnóstico à VPS como root na porta 22, siga [CONEXAO-SSH.md](CONEXAO-SSH.md). Publicar este código no GitHub não instala o painel na VPS.
 >
-> Os workflows originais foram preservados em `docs/upstream-workflows/` como referência. O workflow ativo deste repositório é o diagnóstico SSH manual; ele depende dos Secrets e da preparação do servidor descritos no guia.
+> Os workflows originais foram preservados em `docs/upstream-workflows/` como referência. O diagnóstico SSH manual depende dos Secrets descritos no guia. O workflow Professional release checks executa testes e consultas de advisories, sem acesso à VPS.
+
+## Correções 1.1.1
+
+Consulte [as correções e mudanças de operação](CORRECOES-1.1.1.md), especialmente a recuperação de A2F e a quarentena do File Manager. As validações locais não substituem a homologação de serviços na VPS.
 
 ## Novidades da camada 1.1
 
-- **A2F:** configuração guiada, QR Code gerado localmente, segredo fora de argumentos de processo e acompanhamento dos administradores.
+- **A2F:** preparação e confirmação na conta titular, QR local, senha/fator nas alterações e recuperação descartável.
 - **Backups multicloud:** cópia criptografada para Google Drive, Amazon S3, FTPS, FTP com aceite explícito, SFTP e nuvem privada; arquivo nativo com sites e dumps dos bancos, verificação e recuperação isolada.
 - **Assistente virtual local:** roteiros de servidor, DNS, e-mail, backup e proteção, sem publicar configurações automaticamente.
 - **WAF e Fail2Ban:** perfis de observação a avançado, validação e rollback; cobertura automática limitada ao Apache e às jails nativas.
-- **Projetos:** editor nativo, integração opcional com code-server/Portainer/listmonk, gerenciamento administrativo Docker/Compose, unidade Node.js e templates de proxy.
+- **Projetos:** integrações opcionais com code-server/Portainer/listmonk, CLI Docker/Compose/Node e proxy. File Manager legado bloqueado até revisão das dependências.
 
 Guias: [auditoria e pendências](AUDITORIA-1.1.md) · [backup em nuvem](BACKUPS-NUVEM.md) · [A2F/WAF/Fail2Ban](SEGURANCA-A2F-WAF.md) · [projetos e ferramentas](PROJETOS-PLATAFORMA.md).
 
 **Estado:** código e testes locais; nenhum desses serviços foi ativado na VPS do proprietário. Integrações externas exigem instalação, credenciais, autenticação e homologação. Os cartões da central informam essa necessidade e não simulam serviços instalados.
 
-**Verificação posterior de 19/10/2026:** a [auditoria dos pedidos e da revisão publicada](AUDITORIA-VERIFICACAO-2026-10-19.md) confirma as entregas e identifica pendências em A2F, revalidação no refresh e estado efetivo do WAF. Os recursos empresariais adicionais ainda não constituem uma entrega completa. Consulte o relatório antes de implantar.
+**Auditoria anterior:** a [verificação da revisão 1.1](AUDITORIA-VERIFICACAO-2026-10-19.md) registrou as falhas que motivaram a camada [1.1.1](CORRECOES-1.1.1.md). Os recursos empresariais adicionais continuam fora da entrega completa.
 
-![Módulos da central — prévia ilustrativa](docs/screenshots/platform-modules-1440.png)
+![Módulos da central — prévia ilustrativa](docs/screenshots/1.1.1/dashboard-1440.png)
 
 <h1 align="center"><a href="https://www.hestiacp.com/">Hestia Control Panel</a></h1>
 
@@ -28,12 +32,12 @@ Capturas com dados ilustrativos, sem conexão com a VPS. Consulte [os detalhes d
 
 ### Computador
 
-![Nova central HestiaCP — prévia para computador](docs/screenshots/dashboard-1440.png)
+![Nova central HestiaCP — prévia para computador](docs/screenshots/1.1.1/dashboard-1440.png)
 
 <details>
 <summary>Ver versão para celular</summary>
 
-<img src="docs/screenshots/dashboard-360.png" alt="Nova central HestiaCP — prévia para celular" width="360">
+<img src="docs/screenshots/1.1.1/dashboard-360.png" alt="Nova central HestiaCP — prévia para celular" width="360">
 
 </details>
 

@@ -1,0 +1,7 @@
+#!/bin/bash
+# info: manage MFA through a bounded stdin JSON request
+# options: USER ACTION
+set -eu
+[[ $# == 2 && $1 =~ ^[a-z][a-z0-9_]{1,29}$ ]] || exit 1
+case "$2" in prepare|enable|disable|recovery|verify|reauth) ;; *) exit 1 ;; esac
+exec /usr/bin/python3 /usr/local/hestia/professional/mfa.py --user "$1" --action "$2"

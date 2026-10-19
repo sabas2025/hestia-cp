@@ -75,7 +75,7 @@ node_v="24"
 # Defining software pack for all distros
 software="acl apache2 apache2-suexec-custom apache2-utils at awstats bc bind9 bsdmainutils bsdutils
   clamav-daemon cron curl dnsutils dovecot-imapd dovecot-managesieved dovecot-pop3d dovecot-sieve e2fslibs e2fsprogs
-  exim4 exim4-daemon-heavy expect fail2ban flex ftp git python3-qrcode hestia=${HESTIA_INSTALL_BUILD} hestia-nginx hestia-php hestia-web-terminal
+  exim4 exim4-daemon-heavy expect fail2ban flex ftp git python3-qrcode python3-cryptography hestia=${HESTIA_INSTALL_BUILD} hestia-nginx hestia-php hestia-web-terminal
   idn2 imagemagick ipset jq libapache2-mod-fcgid libapache2-mod-php$fpm_v libapache2-mpm-itk libmail-dkim-perl lsb-release
   lsof mariadb-client mariadb-common mariadb-server mc mysql-client mysql-common mysql-server net-tools nginx nodejs openssh-server
   php$fpm_v php$fpm_v-apcu php$fpm_v-bz2 php$fpm_v-cgi php$fpm_v-cli php$fpm_v-common php$fpm_v-curl php$fpm_v-gd
@@ -2027,7 +2027,7 @@ fi
 #----------------------------------------------------------#
 
 echo "[ * ] Configuring File Manager..."
-hst_run "Install File Manager" "$HESTIA/bin/v-add-sys-filemanager" quiet
+hst_run "Keep optional File Manager disabled pending dependency review" "$HESTIA/bin/v-change-sys-config-value" FILE_MANAGER false
 if [[ $release -ge 13 ]]; then
 	echo 'KexAlgorithms +diffie-hellman-group-exchange-sha256' > /etc/ssh/sshd_config.d/hestia-kex.conf
 fi

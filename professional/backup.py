@@ -10,7 +10,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from ops import atomic_json, config, lock, private_read, require_root, username, utcnow
+from ops import atomic_json, config, lock, private_read, require_root, safe_environment, username, utcnow
 
 def settings(path):
     stat = path.stat()
@@ -60,7 +60,7 @@ def execute(action, user, cfg, root, runner=checked):
         raise ValueError("Backup folder must be absolute")
     progress = {"schema": 1, "user": user, "action": action, "state": "running", "step": "starting", "started_at": utcnow(), "updated_at": utcnow()}
     path = root / "data/professional/jobs" / f"{user}.json"
-    env = {**os.environ, "RESTIC_REPOSITORY": cfg["repository"], "RESTIC_PASSWORD_FILE": cfg["password_file"]}
+    env = {**safe_environment(), "RESTIC_REPOSITORY": cfg["repository"], "RESTIC_PASSWORD_FILE": cfg["password_file"]}
     env.pop("RESTIC_PASSWORD", None)
     def step(name):
         progress.update(step=name, updated_at=utcnow()); atomic_json(path, progress)
@@ -74,7 +74,7 @@ def execute(action, user, cfg, root, runner=checked):
             elif action == "run":
                 step("consistent-hestia-backup")
                 before = {p: p.stat().st_mtime_ns for p in backup_dir.glob(f"{user}.*.tar")}
-                runner([str(root / "bin/v-backup-user"), user], env=None)
+                runner([str(root / "bin/v-backup-user"), user], env=safe_environment())
                 candidates = [p for p in backup_dir.glob(f"{user}.*.tar") if not p.is_symlink() and p.stat().st_size > 0 and (p not in before or p.stat().st_mtime_ns > before[p])]
                 if not candidates:
                     raise RuntimeError("No newly completed Hestia archive was found")

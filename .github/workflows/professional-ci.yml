@@ -1,0 +1,42 @@
+name: Professional release checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: professional-ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install QA tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y php8.3-cli python3-qrcode python3-cryptography shellcheck nodejs npm zstd composer
+          npm ci --ignore-scripts --prefix professional/tests/browser
+          professional/tests/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Fetch exact Composer-locked TOTP library for the isolated test
+        run: |
+          mkdir -p .qa/twofactor
+          git -C .qa/twofactor init
+          git -C .qa/twofactor fetch --depth 1 https://github.com/RobThree/TwoFactorAuth.git 85408c4e775dba7c0802f2d928efd921d530bc5b
+          git -C .qa/twofactor checkout --detach FETCH_HEAD
+      - name: Mandatory tests without skipped checks
+        run: |
+          browser_path=$(node -e 'process.stdout.write(require("./professional/tests/browser/node_modules/playwright").chromium.executablePath())')
+          sudo env PHP_BINARY=/usr/bin/php8.3 SHELLCHECK_BINARY=/usr/bin/shellcheck \
+            TWOFA_LIBRARY_ROOT="$GITHUB_WORKSPACE/.qa/twofactor/lib" \
+            PLAYWRIGHT_MODULE="$GITHUB_WORKSPACE/professional/tests/browser/node_modules/playwright" \
+            CHROME_BIN="$browser_path" /usr/bin/python3 professional/tests/run_checks.py --output /tmp/hestia-verification.json
+      - name: Check advisories for locked dependencies
+        run: |
+          composer --working-dir=web/inc audit --locked --no-dev
+          composer --working-dir=web/src audit --locked --no-dev
+          npm audit --package-lock-only --ignore-scripts --audit-level=high
+          npm audit --prefix src/deb/web-terminal --package-lock-only --ignore-scripts --audit-level=high
+          npm audit --prefix professional/tests/browser --package-lock-only --ignore-scripts --audit-level=high

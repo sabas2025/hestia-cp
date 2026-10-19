@@ -1,3 +1,5 @@
+> **Operação atual 1.1.1:** leia [CORRECOES-1.1.1.md](CORRECOES-1.1.1.md) antes de usar os procedimentos abaixo. A2F, estados WAF, drill histórico e disponibilidade do File Manager foram alterados. O texto 1.0/1.1 abaixo permanece como referência histórica onde houver diferença.
+
 # Editor, Docker, Compose, Node.js, marketing e proxy
 
 Ferramentas da camada 1.1. As integrações não significam que Docker, Portainer, code-server ou listmonk já estejam instalados. A central mostra os módulos e libera atalhos HTTPS após configuração. Serviços externos mantêm autenticação própria. Operações de infraestrutura são feitas no terminal administrativo; o PHP não recebe permissões do daemon Docker.

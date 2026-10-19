@@ -26,8 +26,8 @@ def settings(path):
     cfg = json.loads(private_read(path))
     if not isinstance(cfg, dict) or set(cfg) - {'profile', 'waf', 'fail2ban', 'admin_cidrs', 'request_body_limit'}:
         raise ValueError('Unknown security configuration field')
-    if cfg.get('profile') not in PROFILES or type(cfg.get('waf')) is not bool or type(cfg.get('fail2ban')) is not bool or not (cfg['waf'] or cfg['fail2ban']):
-        raise ValueError('Select a profile and at least one protection')
+    if cfg.get('profile') not in PROFILES or type(cfg.get('waf')) is not bool or type(cfg.get('fail2ban')) is not bool:
+        raise ValueError('Select a profile and explicit desired states')
     limit = cfg.setdefault('request_body_limit', 134217728)
     if type(limit) is not int or not 1048576 <= limit <= 1073741824:
         raise ValueError('Request body limit must be between 1 MiB and 1 GiB')
@@ -59,10 +59,11 @@ def effective_ignores(runner=command):
         result[jail] = values
     return result
 
-def render(cfg, existing=None):
+def render(cfg, existing=None, managed=()):
     mode, pl, retry, bantime = PROFILES[cfg['profile']]
     files = {}
-    if cfg['waf']:
+    if cfg['waf'] or 'waf' in managed:
+        if not cfg['waf']: mode = 'Off'
         files[WAF] = f'''{MARKER}
 <IfModule security2_module>
     SecDataDir /var/cache/modsecurity
@@ -83,10 +84,10 @@ def render(cfg, existing=None):
     IncludeOptional /etc/modsecurity/crs/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf
 </IfModule>
 '''
-    if cfg['fail2ban']:
+    if cfg['fail2ban'] or 'fail2ban' in managed:
         files[JAIL] = MARKER + '\n' + ''.join(f'''
 [{jail}]
-enabled = true
+enabled = {'true' if cfg['fail2ban'] else 'false'}
 maxretry = {retry}
 findtime = 600
 bantime = {bantime}
@@ -94,7 +95,7 @@ ignoreip = {' '.join(dict.fromkeys(['127.0.0.1/8', '::1'] + cfg['admin_cidrs'] +
 ''' for jail in ('ssh-iptables', 'hestia-iptables'))
     return files
 
-def prerequisites(fs, hestia, cfg, runner=command):
+def prerequisites(fs, hestia, cfg, runner=command, desired=None):
     conf = config(hestia / 'conf/hestia.conf')
     if conf.get('VERSION') != '1.10.5': raise ValueError('Review protection for this Hestia version')
     if cfg['waf']:
@@ -114,7 +115,13 @@ def prerequisites(fs, hestia, cfg, runner=command):
         native = fs / 'etc/fail2ban/jail.local'
         if not native.is_file() or not all(f'[{j}]' in native.read_text() for j in ('ssh-iptables', 'hestia-iptables')):
             raise ValueError('Expected native Hestia jails not found; do not add duplicate SSH jails')
-        for unit in ('ssh-iptables', 'hestia-iptables'): runner(['fail2ban-client', 'status', unit])
+        if (desired or cfg)['fail2ban']:
+            for unit in ('ssh-iptables', 'hestia-iptables'): runner(['fail2ban-client', 'status', unit])
+
+def managed_components(fs):
+    return {name for name, relative in [('waf', WAF), ('fail2ban', JAIL)]
+            if (fs / relative).is_file() and not (fs / relative).is_symlink()
+            and MARKER in (fs / relative).read_text()}
 
 def validate_reload(cfg, runner):
     # Validate all touched services before reloading either one.
@@ -136,12 +143,14 @@ def restore_files(fs, previous):
             atomic_file(path, data, info['mode'])
 
 def apply_profile(fs, hestia, cfg, runner=command, peer=None):
-    prerequisites(fs, hestia, cfg, runner)
+    managed = managed_components(fs)
+    reload_cfg = {**cfg, **{key: cfg[key] or key in managed for key in ('waf', 'fail2ban')}}
+    prerequisites(fs, hestia, reload_cfg, runner, desired=cfg)
     if cfg['fail2ban'] and peer and not any(ipaddress.ip_address(peer) in ipaddress.ip_network(v) for v in cfg['admin_cidrs']):
         raise ValueError('Current SSH IP must be included in administrator exemptions')
     state = private_directory(fs / STATE, 0o700)
     with lock(state / 'locks/security.lock'):
-        files = render(cfg, effective_ignores(runner) if cfg['fail2ban'] else {}); previous = {}
+        files = render(cfg, effective_ignores(runner) if cfg['fail2ban'] else {}, managed); previous = {}
         for name in files:
             path = fs / name
             if path.is_symlink() or any(p.is_symlink() for p in path.parents): raise ValueError('Managed symlink rejected')
@@ -150,19 +159,25 @@ def apply_profile(fs, hestia, cfg, runner=command, peer=None):
         transaction = uuid.uuid4().hex
         public_path = hestia / 'data/professional/security.json'
         previous_public = json.loads(public_path.read_text()) if public_path.is_file() and not public_path.is_symlink() else None
-        record = {'schema': 1, 'id': transaction, 'created_at': utcnow(), 'config': cfg, 'previous': previous, 'previous_public': previous_public}
+        record = {'schema': 2, 'id': transaction, 'created_at': utcnow(), 'config': reload_cfg, 'desired': cfg, 'previous': previous, 'previous_public': previous_public}
         atomic_json(state / 'transactions' / f'{transaction}.json', record, 0o600)
         try:
             for name, content in files.items(): atomic_file(fs / name, content.encode(), 0o644)
-            validate_reload(cfg, runner)
+            validate_reload(reload_cfg, runner)
         except Exception as original:
             restore_files(fs, previous)
-            try: validate_reload(cfg, runner)
+            try: validate_reload(reload_cfg, runner)
             except Exception:
                 raise RuntimeError('Protection failed; original files restored but service recovery requires console review') from original
             raise RuntimeError('Protection failed; original configuration restored and reloaded') from original
-        public = {'schema': 1, 'configured_at': utcnow(), 'profile': cfg['profile'], 'waf': cfg['waf'],
-                  'fail2ban': cfg['fail2ban'], 'rollback_id': transaction,
+        controlled = {key: reload_cfg[key] for key in ('waf', 'fail2ban')}
+        public = {'schema': 2, 'configured_at': utcnow(), 'profile': cfg['profile'],
+                  'waf': cfg['waf'] if controlled['waf'] else None,
+                  'fail2ban': cfg['fail2ban'] if controlled['fail2ban'] else None,
+                  'managed': controlled, 'desired_state': {key: cfg[key] for key in controlled},
+                  'effective_policy': {'waf': ('off' if not cfg['waf'] else 'detection-only' if cfg['profile'] == 'observacao' else 'on') if controlled['waf'] else 'unmanaged',
+                                       'fail2ban': ('on' if cfg['fail2ban'] else 'off') if controlled['fail2ban'] else 'unmanaged'},
+                  'runtime_attack_tested': False, 'rollback_id': transaction,
                   'scope': 'apache-backed-sites-and-native-ssh-panel-jails', 'verified_at_apply': True}
         atomic_json(hestia / 'data/professional/security.json', public)
         return public
@@ -208,7 +223,7 @@ def main():
     if args.config is None: raise ValueError('Configuration required')
     cfg = settings(args.config)
     if args.action == 'plan' or not args.apply:
-        files = render(cfg, effective_ignores(command) if cfg['fail2ban'] else {}); diffs = {}
+        files = render(cfg, effective_ignores(command) if cfg['fail2ban'] else {}, managed_components(fs)); diffs = {}
         for name, body in files.items():
             path = fs / name
             diffs[name] = ''.join(difflib.unified_diff(path.read_text().splitlines(True) if path.is_file() else [], body.splitlines(True), fromfile=name, tofile='proposed/' + name))

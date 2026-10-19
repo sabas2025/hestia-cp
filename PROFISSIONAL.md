@@ -1,3 +1,5 @@
+> **Operação atual 1.1.1:** leia [CORRECOES-1.1.1.md](CORRECOES-1.1.1.md) antes de usar os procedimentos abaixo. A2F, estados WAF, drill histórico e disponibilidade do File Manager foram alterados. O texto 1.0/1.1 abaixo permanece como referência histórica onde houver diferença.
+
 > Atualização 1.1.0 (19/10/2026): consulte [AUDITORIA-1.1.md](AUDITORIA-1.1.md), [BACKUPS-NUVEM.md](BACKUPS-NUVEM.md), [SEGURANCA-A2F-WAF.md](SEGURANCA-A2F-WAF.md) e [PROJETOS-PLATAFORMA.md](PROJETOS-PLATAFORMA.md). O restante deste guia registra a base 1.0. Antes de aplicar em um Hestia existente, instale `python3-qrcode` pelo APT: a camada 1.1 também substitui os helpers nativos de A2F por geração local, sob contrato de hashes. Docker, WAF e backups não são ativados automaticamente.
 
 # HestiaCP Professional 1.0.0 — guia de uso

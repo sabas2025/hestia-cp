@@ -161,6 +161,16 @@ if (!empty($_POST["save"]) && $read_only !== true) {
 		exit();
 	}
 
+    // Reauthenticate the real actor before password changes; never accept an impersonated identity here.
+    if (!empty($_POST['v_password']) && empty($_SESSION['error_msg'])) {
+        if (!defined('HST_PRO_MFA')) { define('HST_PRO_MFA', true); }
+        require_once dirname(__DIR__, 2) . '/professional/mfa-client.php';
+        try {
+            pro_mfa_call($_SESSION['user'], 'reauth', ['password'=>(string)($_POST['v_current_password'] ?? ''), 'code'=>(string)($_POST['v_current_factor'] ?? '')]);
+        } catch (Throwable $errorMfa) { $_SESSION['error_msg'] = 'Confirme a senha atual da sua conta e o fator, quando habilitado.'; }
+        unset($_POST['v_current_password'], $_POST['v_current_factor']);
+    }
+
 	// Change password
 	if (!empty($_POST["v_password"]) && empty($_SESSION["error_msg"])) {
 		// Check password length
@@ -189,35 +199,7 @@ if (!empty($_POST["save"]) && $read_only !== true) {
 		}
 	}
 
-	// Enable twofa
-	if (!empty($_POST["v_twofa"]) && empty($v_twofa) && empty($_SESSION["error_msg"])) {
-		exec(HESTIA_CMD . "v-add-user-2fa " . quoteshellarg($v_username), $output, $return_var);
-		check_return_code($return_var, $output);
-		unset($output);
-
-		// List user
-		exec(
-			HESTIA_CMD . "v-list-user " . quoteshellarg($v_username) . " json",
-			$output,
-			$return_var,
-		);
-		check_return_code($return_var, $output);
-		$data = json_decode(implode("", $output), true);
-		unset($output);
-
-		// Parse user twofa
-		$v_twofa = $data[$v_username]["TWOFA"];
-		$v_qrcode = $data[$v_username]["QRCODE"];
-	}
-
-	// Disable twofa
-	if (empty($_POST["v_twofa"]) && !empty($v_twofa) && empty($_SESSION["error_msg"])) {
-		exec(HESTIA_CMD . "v-delete-user-2fa " . quoteshellarg($v_username), $output, $return_var);
-		check_return_code($return_var, $output);
-		unset($output);
-		$v_twofa = "";
-		$v_qrcode = "";
-	}
+	// MFA changes are exclusively handled by the reauthenticated self-service route.
 
 	// Change default sort order
 	if ($v_sort_order != $_POST["v_sort_order"] && empty($_SESSION["error_msg"])) {

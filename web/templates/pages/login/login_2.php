@@ -13,11 +13,11 @@
 		<div class="u-mb20">
 			<label for="twofa" class="form-label u-side-by-side">
 				<?= tohtml( _("2FA Token")) ?>
-				<a class="login-form-link" href="/reset2fa/">
-					<?= tohtml( _("Forgot Token")) ?>
+				<a class="login-form-link" href="/login/?logout">
+					<?= tohtml( _("Recovery code: enter below")) ?>
 				</a>
 			</label>
-			<input type="text" class="form-control" name="twofa" id="twofa" autocomplete="one-time-code" required autofocus>
+			<input type="text" class="form-control" name="twofa" id="twofa" autocomplete="one-time-code" maxlength="40" required autofocus>
 		</div>
 		<div class="u-side-by-side">
 			<button type="submit" class="button">

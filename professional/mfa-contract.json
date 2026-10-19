@@ -1,6 +1,36 @@
 {
-  "web/inc/2fa/secret.php": "6c84c6b86d0be98ebb86e4797501bbe6dee3fe600175b21df25ceb3b155b2564",
-  "web/inc/2fa/check.php": "26e0de1372db8ad2b1b9bb200b5648d0e9651b8c23a539b45a8471baf33d77f9",
-  "bin/v-add-user-2fa": "1ca297888943a8fa4d17a199e574071272720de63b383510abed75f04346cec6",
-  "bin/v-check-user-2fa": "1dd5fdf34d5d57c9a182f07c398bcb65e24af8a6763aa5c9baf405b642cdc9b0"
+  "web/inc/2fa/secret.php": [
+    "6c84c6b86d0be98ebb86e4797501bbe6dee3fe600175b21df25ceb3b155b2564",
+    "fc698076055e6f0d562d3b8c72d5a6c626afae04cb60b49d8cc3e369e89c2deb"
+  ],
+  "web/inc/2fa/check.php": [
+    "26e0de1372db8ad2b1b9bb200b5648d0e9651b8c23a539b45a8471baf33d77f9",
+    "21169e13a4bd6b3de185fce0c10cc06e571117b17c3f114976a33c3816968a24"
+  ],
+  "bin/v-add-user-2fa": [
+    "1ca297888943a8fa4d17a199e574071272720de63b383510abed75f04346cec6",
+    "d95a7fe83b7cccc8be803491b623cd14b09422e324ede945b1c74299eada491d"
+  ],
+  "bin/v-check-user-2fa": [
+    "1dd5fdf34d5d57c9a182f07c398bcb65e24af8a6763aa5c9baf405b642cdc9b0",
+    "32b23255725fa24a302d67ba37b5d176f740f0c311bee39a22ba2dda1e3b3fe9"
+  ],
+  "web/edit/user/index.php": [
+    "8e43954efcd88116f1ade15083422b412445d033b1cab6421865a724f656a206"
+  ],
+  "web/templates/pages/edit_user.php": [
+    "6874242c0a0e98d59ba91ea7747c9910d6a5440d9a257bc492624e2783d29882"
+  ],
+  "web/login/index.php": [
+    "75e6dccb211dcc36fea3597ca375e9db35ab85b777826bc9ee2dbc68c2b77f89"
+  ],
+  "web/reset2fa/index.php": [
+    "256a766f431d0e9b545e00fdd7c926307b5ec9e1c4076129ebc79707f8033649"
+  ],
+  "web/templates/pages/login/login_2.php": [
+    "f61baea9c13e107a0bdc616cb91bee4e30c610cb1fd5c5870afebe5b20197920"
+  ],
+  "bin/v-backup-user": [
+    "697b8db6549e07709a63456c49751e455845ea92e3e2d28e88bfee1883525551"
+  ]
 }

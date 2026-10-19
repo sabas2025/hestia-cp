@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the local test suite, syntax checks and optional visual test."""
+"""Run mandatory release checks. --quick explicitly reports incomplete optional checks."""
 import argparse
 from datetime import datetime, timezone
 import json
@@ -15,6 +15,7 @@ ROOT=Path(__file__).resolve().parents[2]
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,default=ROOT/'professional/test-results/verification.json')
+    parser.add_argument('--quick',action='store_true',help='Allow an incomplete local run; never mark it passed')
     args=parser.parse_args()
     result={'generated_at':datetime.now(timezone.utc).isoformat(),'installer_executed':False,'vps_accessed':False,'checks':[]}
     def run(name,command):
@@ -35,16 +36,23 @@ def main():
     if shellcheck:
         run('ShellCheck new shared code',['%s'%shellcheck,'--severity=warning','-e','SC1091,SC2034',str(ROOT/'install/hst-common.sh'),str(ROOT/'install/hst-install.sh')])
         run('ShellCheck installer error-level findings',[shellcheck,'--severity=error','-e','SC1091,SC2034',str(ROOT/'install/hst-install-debian.sh'),str(ROOT/'install/hst-install-ubuntu.sh')])
+    else: result['checks'].append({'name':'ShellCheck','status':'unavailable'})
     node=shutil.which('node')
     if node:run('JavaScript syntax',[node,'--check',str(ROOT/'web/professional/dashboard.js')])
     if node:run('Node project example syntax',[node,'--check',str(ROOT/'professional/node-server.example.mjs')])
-    for name in ('v-add-user-2fa', 'v-check-user-2fa'):run('Bash MFA syntax '+name,['bash','-n',str(ROOT/'bin'/name)])
+    else: result['checks'].append({'name':'Node/JavaScript','status':'unavailable'})
+    for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa'):run('Bash MFA syntax '+name,['bash','-n',str(ROOT/'bin'/name)])
     run('Python syntax',[sys.executable,'-m','compileall','-q',str(ROOT/'professional')])
+    if php:run('Whole-tree source syntax',[sys.executable,str(ROOT/'professional/tests/static_syntax.py')])
     if node and os.environ.get('PLAYWRIGHT_MODULE') and os.environ.get('CHROME_BIN'):
+        run('Generate preview from current PHP',[sys.executable,str(ROOT/'professional/tests/build_preview.py')])
         run('Browser desktop and mobile',[node,str(ROOT/'professional/tests/test_visual.cjs')])
-    result['status']='passed' if outcome.wasSuccessful() and all(c['status']=='passed' for c in result['checks']) else 'incomplete-or-failed'
+    else: result['checks'].append({'name':'Browser desktop and mobile','status':'unavailable'})
+    result['mode'] = 'quick' if args.quick else 'release'
+    complete = outcome.wasSuccessful() and not outcome.skipped and all(c['status']=='passed' for c in result['checks'])
+    result['status']='passed' if complete else 'incomplete-or-failed'
     args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
     print(json.dumps({'status':result['status'],'python':result['python'],'groups':len(result['checks']),'report':str(args.output)},ensure_ascii=False))
-    return 0 if result['status']=='passed' else 1
+    return 0 if complete or (args.quick and outcome.wasSuccessful() and not any(c['status']=='failed' for c in result['checks'])) else 1
 
 if __name__=='__main__':sys.exit(main())

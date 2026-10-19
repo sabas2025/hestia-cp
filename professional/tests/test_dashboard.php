@@ -82,6 +82,11 @@ $lookProjects = pro_payload($impersonated, $account, $root, $runner)['projects']
 expect(count($lookProjects) === 1 && $lookProjects[0]['id'] === 'other-node', 'Impersonation has no global Docker access');
 file_put_contents($root . '/data/professional/backups/clientone-forged-run.json', json_encode(['user' => 'clienttwo', 'id' => 'other', 'provider' => 'private']));
 expect(pro_payload($identity, $account, $root, $runner)['cloud_targets'] === [], 'Wrong-owner cloud snapshot rejected');
+file_put_contents($root . '/data/professional/backups/clientone-main-copy-run.json', json_encode(['user'=>'clientone','id'=>'main-copy','provider'=>'google-drive','state'=>'succeeded','completed_at'=>'2026-10-18T10:00:00Z']));
+file_put_contents($root . '/data/professional/backups/clientone-main-copy-attempt.json', json_encode(['user'=>'clientone','id'=>'main-copy','provider'=>'google-drive','state'=>'failed','attempted_at'=>'2026-10-19T10:00:00Z']));
+$targets = pro_payload($identity, $account, $root, $runner)['cloud_targets'];
+expect($targets[0]['last_success'] === '2026-10-18T10:00:00Z', 'Previous successful copy is retained');
+expect($targets[0]['last_attempt_state'] === 'failed', 'Most recent failed attempt is visible');
 $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
 foreach ($iterator as $file) { $file->isDir() && !$file->isLink() ? rmdir($file->getPathname()) : unlink($file->getPathname()); }
 rmdir($root);

@@ -1,3 +1,5 @@
+> **Operação atual 1.1.1:** leia [CORRECOES-1.1.1.md](CORRECOES-1.1.1.md) antes de usar os procedimentos abaixo. A2F, estados WAF, drill histórico e disponibilidade do File Manager foram alterados. O texto 1.0/1.1 abaixo permanece como referência histórica onde houver diferença.
+
 # Backup de sites e bancos em nuvem — versão 1.1
 
 O novo `professional/cloud_backup.py` cria um backup nativo de uma conta Hestia e envia uma cópia criptografada pelo Restic para cada destino configurado. O Rclone fornece os transportes. A operação começa em modo de planejamento e exige `--apply` para executar.

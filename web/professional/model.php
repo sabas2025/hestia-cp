@@ -119,10 +119,21 @@ function pro_payload(array $identity, array $account, string $root, ?callable $r
     foreach (glob($root . '/data/professional/backups/' . $owner . '-*-run.json') ?: [] as $file) {
         $entry = pro_snapshot($file);
         if ($entry === null || ($entry['user'] ?? '') !== $owner) { continue; }
-        $cloud[] = ['id' => (string)($entry['id'] ?? ''), 'provider' => (string)($entry['provider'] ?? ''),
-                    'state' => (string)($entry['state'] ?? ''), 'completed_at' => (string)($entry['completed_at'] ?? '')];
+        $id = (string)($entry['id'] ?? '');
+        if (!preg_match('/\A[a-z][a-z0-9-]{1,31}\z/D', $id)) { continue; }
+        $cloud[$id] = ['id' => $id, 'provider' => (string)($entry['provider'] ?? ''),
+                    'state' => (string)($entry['state'] ?? ''), 'completed_at' => (string)($entry['completed_at'] ?? ''),
+                    'last_success' => (string)($entry['completed_at'] ?? ''), 'last_attempt_state' => 'unknown', 'last_attempt_at' => ''];
     }
-    return ['identity' => $identity, 'resources' => $resources, 'projects' => $projects, 'cloud_targets' => $cloud,
+    foreach (glob($root . '/data/professional/backups/' . $owner . '-*-attempt.json') ?: [] as $file) {
+        $entry = pro_snapshot($file); $id = $entry['id'] ?? '';
+        if ($entry === null || ($entry['user'] ?? '') !== $owner || !is_string($id) || !preg_match('/\A[a-z][a-z0-9-]{1,31}\z/D', $id)) { continue; }
+        $cloud[$id] ??= ['id'=>$id, 'provider'=>(string)($entry['provider'] ?? ''), 'state'=>'unknown', 'completed_at'=>'', 'last_success'=>''];
+        $cloud[$id]['last_attempt_state'] = in_array($entry['state'] ?? '', ['succeeded','failed'], true) ? $entry['state'] : 'unknown';
+        $cloud[$id]['last_attempt_at'] = (string)($entry['attempted_at'] ?? '');
+    }
+    $policy = pro_snapshot($root . '/professional/component-policy.json');
+    return ['overlay_version' => (string)($policy['overlay_version'] ?? 'unknown'), 'identity' => $identity, 'resources' => $resources, 'projects' => $projects, 'cloud_targets' => array_values($cloud),
         'twofa' => !empty($account['TWOFA']),
         'disk' => (string)($account['U_DISK'] ?? '0'),
         'disk_limit' => (string)($account['DISK_QUOTA'] ?? 'unknown'),

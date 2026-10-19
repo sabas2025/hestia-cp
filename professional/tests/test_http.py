@@ -10,6 +10,7 @@ import time
 import unittest
 import urllib.request
 import urllib.error
+import urllib.parse
 
 ROOT=Path(__file__).resolve().parents[2]
 PHP=os.environ.get('PHP_BINARY') or shutil.which('php')
@@ -25,11 +26,22 @@ class HttpTests(unittest.TestCase):
         shutil.copytree(ROOT/'web/professional',cls.root/'web/professional')
         (cls.root/'web/inc').mkdir()
         shutil.copytree(ROOT/'web/inc/2fa',cls.root/'web/inc/2fa')
+        shutil.copytree(ROOT/'web/reset2fa',cls.root/'web/reset2fa')
         (cls.root/'web/inc/main.php').write_text('''<?php
 if (!isset($_SERVER['HTTP_X_TEST_USER'])) { header('Location: /login/'); exit; }
-$_SESSION=['user'=>$_SERVER['HTTP_X_TEST_USER'],'userContext'=>$_SERVER['HTTP_X_TEST_CONTEXT']??'user','look'=>'','ROOT_USER'=>'admin','VERSION'=>$_SERVER['HTTP_X_TEST_VERSION']??'1.10.5','APP_NAME'=>'Test'];
+$_SESSION=['user'=>$_SERVER['HTTP_X_TEST_USER'],'userContext'=>$_SERVER['HTTP_X_TEST_CONTEXT']??'user','look'=>$_SERVER['HTTP_X_TEST_LOOK']??'','ROOT_USER'=>'admin','VERSION'=>$_SERVER['HTTP_X_TEST_VERSION']??'1.10.5','APP_NAME'=>'Test','token'=>'TEST_SESSION_TOKEN'];
+$read_only=($_SERVER['HTTP_X_TEST_READ_ONLY']??'')==='yes';
 $user_data=['ROLE'=>$_SERVER['HTTP_X_TEST_ROLE']??'user','SUSPENDED'=>$_SERVER['HTTP_X_TEST_SUSPENDED']??'no'];
 function get_user_data($name) { return [$name=>['ROLE'=>'user','SUSPENDED'=>'no','WEB_DOMAINS'=>'0','MAIL_DOMAINS'=>'0','DNS_DOMAINS'=>'0','DATABASES'=>'0','CRON_JOBS'=>'0','BACKUPS'=>'0']]; }
+''')
+        # The self-service HTTP tests verify routing/auth/CSRF. The root operation is
+        # explicitly replaced in this temporary fixture; real factor checks are in test_corrections.
+        trace=str(cls.root/'mfa-call.json')
+        (cls.root/'web/professional/mfa-client.php').write_text('''<?php
+if (!defined('HST_PRO_MFA')) { http_response_code(403); exit; }
+function pro_mfa_call($user,$action,$request) {
+file_put_contents('''+json.dumps(trace)+''',json_encode(['user'=>$user,'action'=>$action,'binding'=>$request['binding']]));
+return ['state'=>'fixture-only']; }
 ''')
         (cls.root/'data/professional').mkdir(parents=True)
         (cls.root/'data/professional/health.json').write_text(json.dumps({'status':'ok','generated_at':'2099-01-01T00:00:00Z','private':'SERVER_ONLY'}))
@@ -44,8 +56,9 @@ function get_user_data($name) { return [$name=>['ROLE'=>'user','SUSPENDED'=>'no'
     @classmethod
     def tearDownClass(cls):
         cls.process.terminate();cls.process.wait(timeout=5);cls.temporary.cleanup()
-    def request(self,path='/professional/',headers=None,method='GET'):
-        request=urllib.request.Request(self.base+path,headers=headers or {},method=method)
+    def request(self,path='/professional/',headers=None,method='GET',data=None):
+        body=urllib.parse.urlencode(data).encode() if data is not None else None
+        request=urllib.request.Request(self.base+path,headers=headers or {},method=method,data=body)
         try:response=urllib.request.build_opener(NoRedirect).open(request,timeout=10)
         except urllib.error.HTTPError as error:response=error
         return response.status,response.headers,response.read().decode()
@@ -75,5 +88,24 @@ function get_user_data($name) { return [$name=>['ROLE'=>'user','SUSPENDED'=>'no'
         status,headers,body=self.request('/professional/?format=json',{'X-Test-User':'admin','X-Test-Context':'admin','X-Test-Role':'admin'})
         self.assertEqual(status,200);self.assertIn('SERVER_ONLY',body)
         self.assertEqual(self.request('/professional/view.php')[0],403)
+    def test_mfa_self_service_auth_csrf_and_readonly(self):
+        self.assertEqual(self.request('/professional/twofactor.php')[0],302)
+        self.assertEqual(self.request('/professional/twofactor.php',self.user())[0],200)
+        for data in ({'action':'prepare'},{'action':'prepare','token':'wrong'}):
+            self.assertEqual(self.request('/professional/twofactor.php',self.user(),'POST',data)[0],403)
+        self.assertEqual(self.request('/professional/twofactor.php',self.user(**{'X-Test-Read-Only':'yes'}),'POST',{'token':'TEST_SESSION_TOKEN','action':'prepare'})[0],403)
+        self.assertEqual(self.request('/professional/mfa-client.php')[0],403)
+        self.assertEqual(self.request('/professional/twofactor-view.php')[0],403)
+    def test_mfa_uses_only_session_owner_and_refuses_impersonation(self):
+        status,headers,body=self.request('/professional/twofactor.php?user=admin',self.user(),'POST',
+                    {'token':'TEST_SESSION_TOKEN','action':'prepare','user':'admin','password':'synthetic'})
+        self.assertEqual(status,200);self.assertIn('no-store',headers['Cache-Control'])
+        trace=json.loads((self.root/'mfa-call.json').read_text())
+        self.assertEqual(trace['user'],'clientone');self.assertNotIn('password',trace)
+        status,_,_=self.request('/professional/twofactor.php',{'X-Test-User':'admin','X-Test-Context':'admin','X-Test-Role':'admin','X-Test-Look':'clientone'})
+        self.assertEqual(status,403)
+    def test_legacy_recovery_cannot_disable_factor(self):
+        status,headers,body=self.request('/reset2fa/',self.user(),'POST',{'user':'clientone','twofa':'SYNTHETIC_SEED'})
+        self.assertEqual(status,302);self.assertEqual(headers['Location'],'/login/')
 
 if __name__=='__main__':unittest.main()

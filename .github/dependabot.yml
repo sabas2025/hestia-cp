@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /web/inc
+    schedule:
+      interval: weekly
+  - package-ecosystem: composer
+    directory: /web/src
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /professional/tests/browser
+    schedule:
+      interval: weekly
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

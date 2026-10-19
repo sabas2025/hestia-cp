@@ -2,6 +2,7 @@
 """Multi-destination encrypted account backups. Plans by default; no browser writes."""
 import argparse
 import configparser
+import gzip
 import hashlib
 import json
 import os
@@ -105,13 +106,22 @@ def inventory(root, user):
 def validate_archive(path, expected):
     """Read headers only, never extract an untrusted archive as root."""
     with tarfile.open(path, 'r:') as archive:
-        names = set()
+        names = set(); authentication_checked = False
         for member in archive:
             name = PurePosixPath(member.name)
             if name.is_absolute() or '..' in name.parts:
                 raise ValueError('Unsafe archive entry')
             if member.isfile() and member.size > 0:
                 names.add(str(name))
+                if str(name) == 'hestia/user.conf':
+                    if member.size > 2097152: raise ValueError('Oversized account metadata')
+                    text = archive.extractfile(member).read().decode('utf-8')
+                    fields = dict(re.findall(r"(?m)^([A-Z_]+)='([^'\r\n]*)'$", text))
+                    if 'TWOFA' not in fields or fields['TWOFA'] or fields.get('QRCODE'):
+                        raise ValueError('Active MFA provisioning secrets must not enter account backup downloads')
+                    if fields.get('PRO_MFA_REENROLL') == 'yes' and fields.get('LOGIN_DISABLED') != 'yes':
+                        raise ValueError('Restored MFA account must require administrative reenrollment')
+                    authentication_checked = True
     missing = []
     for domain in expected['web']:
         if not any(f'web/{domain}/domain_data.tar.{suffix}' in names for suffix in ('gz', 'zst')):
@@ -119,10 +129,56 @@ def validate_archive(path, expected):
     for database in expected['db']:
         if not any(f'db/{database}/{database}.{engine}.sql.{suffix}' in names for engine in ('mysql', 'pgsql') for suffix in ('gz', 'zst')):
             missing.append('db')
-    if missing or not names:
+    if missing or not names or not authentication_checked:
         raise ValueError('Archive missing expected site data or database dumps; review native exclusions and backup logs')
     return {'sites': len(expected['web']), 'databases': len(expected['db']), 'archive_structure': 'verified',
+            'mfa_secrets_omitted': True,
             'sql_import_tested': False, 'application_restored': False}
+
+def verify_nested(path, runner=checked, limit=1099511627776):
+    """Check internal compression streams without extracting website paths or importing SQL."""
+    verified = 0; consumed = 0
+    with tarfile.open(path, 'r:') as outer:
+        for member in outer:
+            if not member.isfile() or not member.name.endswith(('.tar.gz', '.sql.gz', '.tar.zst', '.sql.zst')):
+                continue
+            source = outer.extractfile(member)
+            if member.name.endswith('.gz'):
+                with gzip.GzipFile(fileobj=source) as stream:
+                    while True:
+                        chunk = stream.read(1048576)
+                        if not chunk: break
+                        consumed += len(chunk)
+                        if consumed > limit: raise ValueError('Nested verification budget exceeded')
+            else:
+                with tempfile.TemporaryDirectory(prefix='hestia-zstd-check-') as td:
+                    if shutil.disk_usage(td).free < member.size * 1.2: raise RuntimeError('Insufficient nested verification space')
+                    compressed = Path(td) / 'payload.zst'
+                    with compressed.open('xb') as output:
+                        compressed.chmod(0o600); shutil.copyfileobj(source, output, 1048576)
+                    runner(['zstd', '--test', '--quiet', str(compressed)], env=safe_environment())
+            verified += 1
+    return {'compressed_streams_verified': verified, 'sql_import_tested': False, 'application_restored': False}
+
+def recovery_inventory(folder, archive, user):
+    manifests = [p for p in folder.rglob('account-manifest.json') if p.is_file() and not p.is_symlink() and not any(q.is_symlink() for q in p.parents)]
+    if len(manifests) != 1 or manifests[0].stat().st_size > 2097152:
+        raise ValueError('A historical inventory manifest is required; legacy snapshots need a separately reviewed restore procedure')
+    value = json.loads(manifests[0].read_text())
+    expected = value.get('inventory')
+    if value.get('schema') != 1 or value.get('user') != user or not isinstance(expected, dict) or set(expected) != {'web', 'db'}:
+        raise ValueError('Invalid historical inventory')
+    if any(not isinstance(v, list) or any(not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,253}', name) for name in v) for v in expected.values()):
+        raise ValueError('Unsafe historical inventory')
+    digest = hashlib.sha256()
+    with archive.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1048576), b''): digest.update(chunk)
+    if not hmac_compare(digest.hexdigest(), value.get('archive_sha256', '')): raise ValueError('Historical archive checksum mismatch')
+    return expected
+
+def hmac_compare(left, right):
+    import hmac
+    return isinstance(right, str) and hmac.compare_digest(left, right)
 
 def make_archive(root, user, runner, staging):
     native = config(root / 'conf/hestia.conf')
@@ -158,6 +214,7 @@ def make_archive(root, user, runner, staging):
     with archive.open('rb') as stream:
         for chunk in iter(lambda: stream.read(1048576), b''): digest.update(chunk)
     evidence['sha256'] = digest.hexdigest()
+    evidence['_inventory'] = expected
     return archive, evidence
 
 def execute(action, user, cfg, root, target_id=None, runner=checked):
@@ -179,6 +236,10 @@ def execute(action, user, cfg, root, target_id=None, runner=checked):
         try:
             if action == 'run':
                 archive, result['coverage'] = make_archive(root, user, runner, staging)
+                manifest = Path(staging) / 'account-manifest.json'
+                manifest.write_text(json.dumps({'schema': 1, 'user': user, 'created_at': utcnow(),
+                    'inventory': result['coverage'].pop('_inventory'), 'archive_sha256': result['coverage']['sha256']}))
+                manifest.chmod(0o600)
             for target in targets:
                 item = {'id': target['id'], 'provider': target['provider'], 'state': 'running'}
                 result['targets'].append(item)
@@ -190,7 +251,7 @@ def execute(action, user, cfg, root, target_id=None, runner=checked):
                 try:
                     if action == 'init': runner(['restic', 'init'], env=env)
                     elif action == 'run':
-                        output = runner(['restic', 'backup', '--json', '--tag', tag, str(archive)], env=env)
+                        output = runner(['restic', 'backup', '--json', '--tag', tag, str(archive), str(manifest)], env=env)
                         summaries = [json.loads(line) for line in output.splitlines() if line.strip()]
                         summary = next((x for x in reversed(summaries) if x.get('message_type') == 'summary'), {})
                         snapshot = summary.get('snapshot_id', '')
@@ -215,15 +276,20 @@ def execute(action, user, cfg, root, target_id=None, runner=checked):
                             runner(['restic', 'restore', snapshot, '--target', td, '--verify'], env=env)
                             archives = [p for p in Path(td).rglob(f'{user}.*.tar') if p.is_file() and not p.is_symlink() and not any(q.is_symlink() for q in p.parents)]
                             if len(archives) != 1: raise RuntimeError('Expected one recovered archive')
-                            item['coverage'] = validate_archive(archives[0], inventory(root, user))
+                            expected = recovery_inventory(Path(td), archives[0], user)
+                            item['coverage'] = {**validate_archive(archives[0], expected), **verify_nested(archives[0], runner),
+                                                'inventory_source': 'snapshot-manifest'}
                             item['snapshot_id'] = snapshot
-                            item['drill_scope'] = 'encrypted-restore-and-site-database-archive-structure'
+                            item['drill_scope'] = 'encrypted-restore-historical-inventory-and-compressed-stream-integrity'
                     item.update(state='succeeded', completed_at=utcnow(), duration_seconds=round(time.monotonic() - started, 2))
                     if action in ('run', 'drill'):
                         atomic_json(root / 'data/professional/backups' / f'{user}-{target["id"]}-{action}.json',
                                     {**item, 'user': user, 'rpo_hours': cfg['rpo_hours']})
-                except (RuntimeError, ValueError, OSError, subprocess.TimeoutExpired, StopIteration, KeyError):
+                except (RuntimeError, ValueError, OSError, EOFError, tarfile.TarError, subprocess.TimeoutExpired, StopIteration, KeyError):
                     item.update(state='failed', error='provider-operation-failed', completed_at=utcnow())
+                if action in ('run', 'drill'):
+                    atomic_json(root / 'data/professional/backups' / f'{user}-{target["id"]}-attempt.json',
+                                {**item, 'user': user, 'action': action, 'attempted_at': utcnow(), 'rpo_hours': cfg['rpo_hours']})
                 result['updated_at'] = utcnow(); atomic_json(job, result)
             result['state'] = 'succeeded' if all(t['state'] == 'succeeded' for t in result['targets']) else 'failed'
         except Exception:

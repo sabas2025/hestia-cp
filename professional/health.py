@@ -10,6 +10,7 @@ import ssl
 import sys
 from ops import atomic_json, command, config, require_root, utcnow
 import security
+from apply import verify_deployment
 
 def collect(root=Path("/usr/local/hestia"), runner=command):
     conf = config(root / "conf/hestia.conf")
@@ -76,6 +77,24 @@ def collect(root=Path("/usr/local/hestia"), runner=command):
     for key, title in [('waf', 'Módulo WAF'), ('fail2ban', 'Fail2Ban')]:
         available = data['protection'][key] == 'available'
         check(title, 'ok' if available else 'warning', 'Disponível; revise política efetiva' if available else 'Sem confirmação de funcionamento')
+    try:
+        deployment = verify_deployment(root)
+        check('Integridade da camada', 'ok' if deployment['state'] == 'verified' else 'critical',
+              'Manifesto confere' if deployment['state'] == 'verified' else 'Arquivos divergentes; revisar atualização')
+    except (ValueError, KeyError, OSError):
+        check('Integridade da camada', 'warning', 'Manifesto indisponível; reaplique de uma origem revisada')
+    failed = 0; stale_jobs = 0; job_count = 0
+    for path in (root / 'data/professional/jobs').glob('*.json'):
+        if path.is_symlink() or path.stat().st_size > 1048576: continue
+        try:
+            job = json.loads(path.read_text())
+            job_count += 1
+            failed += job.get('state') == 'failed'
+            stamp = datetime.fromisoformat(job.get('updated_at', '')).timestamp()
+            stale_jobs += job.get('state') == 'running' and datetime.now(timezone.utc).timestamp() - stamp > 86400
+        except (ValueError, OSError, TypeError): stale_jobs += 1
+    check('Tarefas de backup', 'warning' if failed or stale_jobs or not job_count else 'ok',
+          f'{failed} falhas e {stale_jobs} tarefas sem atualização; revise por conta' if job_count else 'Nenhuma execução registrada; configure e teste os backups')
     data["status"] = "critical" if any(c["state"] == "critical" for c in data["checks"]) else "warning" if any(c["state"] == "warning" for c in data["checks"]) else "ok"
     return data
 

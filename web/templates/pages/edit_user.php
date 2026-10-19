@@ -93,6 +93,9 @@
 					</div>
 				</div>
 			</div>
+            <p>Para alterar uma senha, confirme as credenciais da sua própria conta administrativa ou titular. Se A2F estiver ativa, use um código ainda não usado.</p>
+            <label class="form-label">Sua senha atual (somente para trocar senha)<input type="password" class="form-control" name="v_current_password" autocomplete="current-password" maxlength="128"></label>
+            <label class="form-label">Seu autenticador ou recuperação descartável<input class="form-control" name="v_current_factor" autocomplete="one-time-code" maxlength="40"></label>
 			<div id="password-details" class="u-mb20">
 				<?php require $_SERVER["HESTIA"] . "/web/templates/includes/password-requirements.php"; ?>
 				<?php if ($_SESSION["userContext"] === "admin") { ?>
@@ -104,19 +107,9 @@
 					</div>
 				<?php } ?>
 				<div x-cloak x-show="!loginDisabled" id="password-options">
-					<div class="form-check">
-						<input class="form-check-input" type="checkbox" name="v_twofa" id="v_twofa" <?php if (!empty($v_twofa)) echo 'checked' ?>>
-						<label for="v_twofa">
-							<?= tohtml( _("Enable two-factor authentication")) ?>
-						</label>
-					</div>
-					<?php if (!empty($v_twofa)) { ?>
-						<p class="u-mb10"><?= tohtml( _("Account Recovery Code") . ": " . $v_twofa) ?></p>
-						<p class="u-mb10"><?= tohtml( _("Please scan the code below in your 2FA application")) ?>:</p>
-						<div class="u-mb10">
-							<img class="qr-code" src="<?= tohtml($v_qrcode) ?>" alt="<?= tohtml( _("2FA QR Code")) ?>">
-						</div>
-					<?php } ?>
+                    <p>Autenticação de dois fatores: <?= empty($v_twofa) ? 'Desativada' : 'Ativada' ?>.</p>
+                    <p><a href="/professional/twofactor.php">Configurar A2F com confirmação e recuperação descartável</a></p>
+                    <p>A configuração é exclusiva da conta titular. Segredos já cadastrados não são exibidos nesta página.</p>
 				</div>
 				<div x-cloak x-show="!loginDisabled" id="password-options-ip">
 					<div class="form-check">

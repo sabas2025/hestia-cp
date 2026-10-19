@@ -268,14 +268,13 @@ function authenticate_user($user, $password, $twofa = "") {
 						$_SESSION["login"]["password"] = $password;
 						return false;
 					} else {
-						if (strlen($twofa) < 10) {
-							$v_twofa = quoteshellarg($twofa);
-							exec(
-								HESTIA_CMD . "v-check-user-2fa " . $v_user . " " . $v_twofa,
-								$output,
-								$return_var,
-							);
-							unset($output);
+						if (is_string($twofa) && preg_match('/\A(?:[0-9]{6}|HPR-[A-F0-9]{8}-[A-F0-9]{8}-[A-F0-9]{8})\z/D', $twofa)) {
+                            if (!defined('HST_PRO_MFA')) { define('HST_PRO_MFA', true); }
+                            require_once dirname(__DIR__) . '/professional/mfa-client.php';
+                            try {
+                                pro_mfa_call($user, 'verify', ['code'=>$twofa]);
+                                $return_var = 0;
+                            } catch (Throwable $errorMfa) { $return_var = 9; }
 							if ($return_var !== 0) {
 								sleep(2);
 								$error = _("Invalid or missing 2FA token");

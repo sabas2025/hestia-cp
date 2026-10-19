@@ -9,10 +9,32 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from ops import config, private_directory, require_root
+import uuid
+from ops import atomic_json, config, private_directory, private_read, require_root
 
 VERSION = "1.10.5"
 MARKER = "# HESTIA_PROFESSIONAL_HOOK_V1"
+EXPERIMENTAL = {'resources.py', 'antivirus.py', 'cluster.py', 'incremental.py', 'nosql.py', 'enterprise.py',
+                'enterprise.example.json', 'resources.example.json', 'topology.example.json',
+                'incremental.example.json', 'nosql.example.json'}
+
+def verify_deployment(root):
+    """Use the saved root-private manifest, never the installed files as their own reference."""
+    record = json.loads(private_read(root / 'professional/deployment.json', 4194304))
+    if not isinstance(record.get('files'), list) or not record['files']:
+        raise ValueError('Deployment manifest missing')
+    mismatch = []; seen = set()
+    for item in record['files']:
+        path = Path(item['file'])
+        if path.is_absolute() or '..' in path.parts or str(path) in seen:
+            raise ValueError('Unsafe deployment manifest')
+        seen.add(str(path)); target = root / path
+        if target.is_symlink() or any(p.is_symlink() for p in target.parents) or not target.is_file() or target.stat().st_uid != 0 or target.stat().st_mode & 0o777 != item.get('mode') or hashlib.sha256(target.read_bytes()).hexdigest() != item['sha256']:
+            mismatch.append(str(path))
+    if (root / 'web/fm').exists() or (root / 'web/fm').is_symlink():
+        mismatch.append('web/fm:unapproved-component')
+    return {'state': 'review-required' if mismatch else 'verified', 'mismatched': mismatch,
+            'overlay': record['overlay'], 'core_overwritten': False}
 
 def atomic_file(target, content, mode=0o644):
     if target.is_symlink():
@@ -39,7 +61,13 @@ source "$HESTIA/professional/hst-common.sh" || exit 1
 HST_BUNDLE_ROOT="$HESTIA/professional/bundle"
 hst_asset filemanager "$FM_ZIP"'''
     text = target.read_text()
+    guard = "# HESTIA_PROFESSIONAL_FILEMANAGER_REVIEW\nprintf '%s\\n' 'File Manager disabled pending dependency remediation; use a reviewed editor integration.' >&2\nexit 1\n"
+    if 'HESTIA_PROFESSIONAL_FILEMANAGER_REVIEW' not in text:
+        anchor = 'FM_INSTALL_DIR="$HESTIA/web/fm"'
+        if text.count(anchor) != 1: raise ValueError('File Manager gate contract changed')
+        text = text.replace(anchor, anchor + '\n' + guard)
     if new in text:
+        if target.read_text() != text: atomic_file(target, text.encode(), 0o755)
         return False
     if text.count(old) != 1:
         raise ValueError("File Manager download contract changed; review overlay before applying")
@@ -98,34 +126,74 @@ update_rc_modules() {
         if not backup.exists(): atomic_file(backup, roundcube.read_bytes(), 0o600)
         atomic_file(roundcube, text.encode(), 0o755)
 
-def apply_files(root, source, refresh=False):
+def quarantine_file_manager(root):
+    """Move the optional UI outside the web root without deleting any account data."""
+    target = root / 'web/fm'
+    if not target.exists() and not target.is_symlink(): return None
+    if any(p.is_symlink() for p in target.parents): raise ValueError('Unsafe File Manager parent')
+    folder = private_directory(root / 'professional/quarantine', 0o700)
+    saved = folder / ('filemanager-' + uuid.uuid4().hex)
+    os.rename(target, saved)
+    conf = root / 'conf/hestia.conf'; text = conf.read_text()
+    import re
+    if re.search(r"(?m)^FILE_MANAGER='[^'\r\n]*'$", text):
+        text = re.sub(r"(?m)^FILE_MANAGER='[^'\r\n]*'$", "FILE_MANAGER='false'", text)
+    else: text += "\nFILE_MANAGER='false'\n"
+    st = conf.stat(); atomic_file(conf, text.encode(), st.st_mode & 0o777); os.chown(conf, st.st_uid, st.st_gid)
+    return str(saved.relative_to(root))
+
+def apply_files(root, source, refresh=False, quarantine_filemanager=False):
     if root.is_symlink() or not (root / "web/inc/main.php").is_file():
         raise ValueError("Destination is not an installed Hestia tree")
     live = config(root / "conf/hestia.conf").get("VERSION")
     if live and live != VERSION:
         if refresh:
             # Retain official security update; disable the custom page rather than replay old core.
+            atomic_json(root / 'data/professional/deployment-status.json', {'state':'review-required','version':live,'mismatched':['hestia-version']})
             return {"status": "review-required", "version": live, "core_overwritten": False}
         raise ValueError("Review required for this Hestia version")
+    if root.resolve() == source.resolve():
+        if not refresh:
+            raise ValueError('Deployment requires an independently reviewed source tree')
+        try:
+            result = verify_deployment(root)
+        except (ValueError, KeyError, OSError):
+            result = {'state': 'review-required', 'mismatched': ['manifest-unavailable'], 'core_overwritten': False}
+        atomic_json(root / 'data/professional/deployment-status.json', result)
+        return {**result, 'status': result['state']}
     manifest = []
     mfa_contract = json.loads((source / 'professional/mfa-contract.json').read_text())
     # Never overwrite a local MFA hotfix just because the Hestia version string is unchanged.
     for relative, original_hash in mfa_contract.items():
         live_path = root / relative
         expected = source / relative
-        if live_path.is_file() and live_path.read_bytes() != expected.read_bytes() and hashlib.sha256(live_path.read_bytes()).hexdigest() != original_hash:
+        if live_path.is_symlink() or any(p.is_symlink() for p in live_path.parents):
+            raise ValueError('Unsafe authentication path')
+        allowed = original_hash if isinstance(original_hash, list) else [original_hash]
+        if live_path.is_file() and live_path.read_bytes() != expected.read_bytes() and hashlib.sha256(live_path.read_bytes()).hexdigest() not in allowed:
             raise ValueError('MFA contract changed; review local authentication modifications')
+    fm = root / 'web/fm'
+    if fm.exists() or fm.is_symlink():
+        if not quarantine_filemanager:
+            raise ValueError('Existing File Manager requires review. Use --quarantine-filemanager to preserve it outside web root and disable its UI.')
+        quarantine_file_manager(root)
     files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
     files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
-    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa')]
+    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-backup-user')]
+    files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php')]
     files += [source / "web/css/themes/custom/professional.css"]
-    files += [p for p in (source / "professional").glob("*") if p.suffix in (".py", ".service", ".timer", ".json") and p.is_file() and p.name != 'deployment.json']
+    files += [source / 'professional/mfa-logrotate.conf']
+    files += [p for p in (source / "professional").glob("*") if p.suffix in (".py", ".service", ".timer", ".json") and p.is_file() and p.name != 'deployment.json'
+              and p.name not in EXPERIMENTAL and not any(tag in p.name for tag in ('enterprise', 'antivirus', 'cluster', 'incremental'))]
+    for file in files:
+        destination = root / file.relative_to(source)
+        if destination.is_symlink() or any(p.is_symlink() for p in destination.parents): raise ValueError('Unsafe deployment target')
     for file in files:
         destination = root / file.relative_to(source)
         # During a refresh source==root, files already live in place.
         if file.resolve() != destination.resolve():
             atomic_file(destination, file.read_bytes(), 0o755 if file.suffix == ".py" or file.parent.name == 'bin' else 0o644)
-        manifest.append({"file": str(destination.relative_to(root)), "sha256": hashlib.sha256(file.read_bytes()).hexdigest()})
+        manifest.append({"file": str(destination.relative_to(root)), "sha256": hashlib.sha256(file.read_bytes()).hexdigest(), 'mode': destination.stat().st_mode & 0o777})
     common = source / "install/hst-common.sh"
     asset_lock = source / "install/assets.lock.tsv"
     if common.exists():
@@ -144,13 +212,18 @@ def apply_files(root, source, refresh=False):
     if link not in text:
         # Add a link without replacing upstream HTML, authorization or scripts.
         atomic_file(panel, (link + text).encode())
-    atomic_file(root / "professional/deployment.json", json.dumps({"overlay": "1.1.0", "hestia": VERSION, "files": manifest}, indent=2).encode(), 0o600)
+    for relative in ('bin/v-add-sys-filemanager', 'bin/v-add-user-composer', 'bin/v-add-sys-roundcube'):
+        manifest.append({'file': relative, 'sha256': hashlib.sha256((root / relative).read_bytes()).hexdigest(), 'mode': (root / relative).stat().st_mode & 0o777})
+    policy = json.loads((source / 'professional/component-policy.json').read_text())
+    atomic_file(root / "professional/deployment.json", json.dumps({"overlay": policy['overlay_version'], "hestia": VERSION, "files": manifest}, indent=2).encode(), 0o600)
+    atomic_json(root / 'data/professional/deployment-status.json', {'state': 'verified', 'mismatched': [], 'overlay': policy['overlay_version']})
     return {"status": "applied", "version": VERSION, "files": len(manifest)}
 
 def enable_services(root):
     if root != Path("/usr/local/hestia"):
         raise ValueError("System integration is limited to /usr/local/hestia")
     require_root()
+    atomic_file(Path('/etc/logrotate.d/hestia-professional-mfa'), (root / 'professional/mfa-logrotate.conf').read_bytes(), 0o644)
     hook = Path("/etc/hestiacp/hooks/post_install.sh")
     saved = hook.with_name("post_install.before-professional.sh")
     if hook.exists() and MARKER not in hook.read_text():
@@ -179,8 +252,9 @@ def main():
     parser.add_argument("--source", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--enable-services", action="store_true")
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--quarantine-filemanager", action="store_true")
     args = parser.parse_args(); require_root()
-    result = apply_files(args.root.absolute(), args.source.resolve(), args.refresh)
+    result = apply_files(args.root.absolute(), args.source.resolve(), args.refresh, args.quarantine_filemanager)
     if args.enable_services and result["status"] == "applied": enable_services(args.root.absolute())
     print(json.dumps(result, indent=2))
     return 0

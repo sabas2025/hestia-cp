@@ -44,7 +44,10 @@ if [ -z "$TWOFA" ]; then
 fi
 
 # Check if token is valid
-result=$(printf '%s\n%s\n' "$TWOFA" "$token" | "$HESTIA_PHP" "$HESTIA/web/inc/2fa/check.php")
+if [[ ! "$token" =~ ^[0-9]{6}$ && ! "$token" =~ ^HPR-[A-F0-9]{8}-[A-F0-9]{8}-[A-F0-9]{8}$ ]]; then
+	exit 9
+fi
+result=$(printf '{"code":"%s"}' "$token" | "$HESTIA/bin/v-professional-mfa" "$user" verify)
 if [ "$result" != "ok" ]; then
 	echo "Error: Authentication token mismatch."
 	exit 9

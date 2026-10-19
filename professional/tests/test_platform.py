@@ -26,6 +26,9 @@ def private(path, body):
 
 def archive(path, names):
     with tarfile.open(path, 'w') as tar:
+        metadata = b"TWOFA=''\nQRCODE=''\nLOGIN_DISABLED='no'\n"
+        info = tarfile.TarInfo('hestia/user.conf'); info.size = len(metadata)
+        tar.addfile(info, io.BytesIO(metadata))
         for name in names:
             data = b'test-fixture'; item = tarfile.TarInfo(name); item.size = len(data)
             tar.addfile(item, io.BytesIO(data))

@@ -209,6 +209,9 @@ mkdir $tmpdir/hestia
 
 echo -e "$(date "+%F %T") $user.conf" | tee -a $BACKUP/$user.log
 cp -r $USER_DATA/user.conf $tmpdir/hestia/
+# HESTIA_PROFESSIONAL_BACKUP_MFA_V1: never expose a live factor through account downloads.
+/usr/bin/python3 "$HESTIA/professional/backup_auth.py" "$tmpdir/hestia/user.conf"
+check_result $? "Failed to sanitize authentication material in backup" "$E_PARSING"
 cp -r $USER_DATA/ssl $tmpdir/hestia/
 
 if [ -e "$USER_DATA/stats.log" ]; then

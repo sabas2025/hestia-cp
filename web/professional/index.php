@@ -14,13 +14,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
 try {
     // main.php rechecks role, account existence and session against live data.
     $identity = pro_identity($_SESSION, $user_data ?? []);
+    $deployment = pro_snapshot(dirname(__DIR__, 2) . '/data/professional/deployment-status.json');
+    if (($deployment['state'] ?? '') === 'review-required') {
+        http_response_code(503); exit('Central aguardando revisão dos arquivos após atualização. Use o painel nativo.');
+    }
     if (($_SESSION['VERSION'] ?? '') !== '1.10.5') {
         http_response_code(503); exit('Central em revisão para esta versão. Acesse /list/web/ para continuar no painel.');
     }
     $account = get_user_data($identity['owner'])[$identity['owner']] ?? [];
     if (($account['SUSPENDED'] ?? 'yes') !== 'no') { throw new RuntimeException('Suspended account'); }
     $payload = pro_payload($identity, $account, dirname(__DIR__, 2));
-    $payload['file_manager'] = ($_SESSION['FILE_MANAGER'] ?? '') === 'true';
+    $policy = pro_snapshot(dirname(__DIR__, 2) . '/professional/component-policy.json');
+    $payload['file_manager'] = ($_SESSION['FILE_MANAGER'] ?? '') === 'true' && ($policy['optional_components']['filemanager']['approved'] ?? false) === true;
 } catch (Throwable $error) {
     http_response_code(403); exit('Acesso não autorizado.');
 }
