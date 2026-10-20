@@ -1,0 +1,176 @@
+{
+  "generated_at": "2026-10-20T11:27:44.523386+00:00",
+  "release": "1.1.1",
+  "functional_commit": "35cb5e5a7ff77fadc1146c8e453411d8be8456d3",
+  "functional_tree": "91bce6bf12066542b5985978eceb085aa010c95f",
+  "scope": "source audit and isolated tests; no production deployment",
+  "installer_executed": false,
+  "vps_accessed": false,
+  "cloud_providers_tested": false,
+  "sql_import_tested": false,
+  "application_restored": false,
+  "closing_checks": {
+    "download": {
+      "commit": "35cb5e5a7ff77fadc1146c8e453411d8be8456d3",
+      "archive_sha256": "b51de6c9d243d98706c4d8af5d4fd5f2c82743d58546d537bb65e0684d7df6e7",
+      "bytes": 7356931,
+      "files": 1659
+    },
+    "integrity": {
+      "revision": "35cb5e5a7ff77fadc1146c8e453411d8be8456d3",
+      "source_files": 1659,
+      "blob_mismatches": [],
+      "checksum_entries": 1658,
+      "checksum_failures": [],
+      "method": "downloaded GitHub codeload ZIP; Git blob SHA-1 and SHA256SUMS independently checked; modes restored from Git tree"
+    },
+    "github_ci": {
+      "id": 39302605426,
+      "url": "https://github.com/sabas2025/hestia-cp/actions/runs/39302605426",
+      "head_sha": "35cb5e5a7ff77fadc1146c8e453411d8be8456d3",
+      "status": "completed",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 118231397292,
+          "name": "checks",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 39302605426,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Install QA tools",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Fetch exact Composer-locked TOTP library for the isolated test",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Mandatory tests without skipped checks",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Check advisories for locked dependencies",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 12
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 13
+            }
+          ]
+        }
+      ]
+    },
+    "negative_control": {
+      "expected_exit": 1,
+      "actual_exit": 1,
+      "expected_status": "incomplete-or-failed",
+      "actual_status": "incomplete-or-failed",
+      "python": {
+        "tests": 92,
+        "failures": 1,
+        "errors": 8,
+        "skipped": 14
+      },
+      "missing_tools": [
+        "PHP tests",
+        "ShellCheck",
+        "Browser desktop and mobile"
+      ],
+      "interpretation": "Expected rejection without QA dependencies; missing PHP and qrcode also cause dependency-related unittest errors. This is not a successful functional suite."
+    }
+  },
+  "published_full_test_evidence": {
+    "path": "professional/test-results/verification-1.1.1.json",
+    "sha256": "c0cebd2ab5f959f7f11fb2236f9ac54f8dad69b00c8196ec3ea4ac7fa41a28c3",
+    "status": "passed",
+    "python": {
+      "tests": 92,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "groups": 26,
+    "php_assertions": 34,
+    "syntax": {
+      "php": 329,
+      "bash": 679
+    },
+    "browser_widths": [
+      360,
+      768,
+      1440
+    ]
+  },
+  "preceding_stage_record": {
+    "provenance": "Recorded results from the preceding correction/audit session; summarized here, not recreated raw execution logs. Independent CI and current closing integrity checks are recorded separately.",
+    "downloaded_commit_retested": "35cb5e5a7ff77fadc1146c8e453411d8be8456d3",
+    "python": {
+      "tests": 92,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "php_assertions": 34,
+    "check_groups": 26,
+    "build_js_css": "passed",
+    "documentation_tests": {
+      "tests": 8,
+      "status": "passed"
+    },
+    "markdown_literal_scanner": "passed",
+    "zstd_fixture": {
+      "valid_stream": "accepted",
+      "corrupt_stream": "rejected",
+      "sql_executed": false
+    }
+  },
+  "advisory_evidence": {
+    "path": "professional/test-results/advisories-1.1.1.json",
+    "date": "2026-10-19",
+    "active_npm_scopes_without_advisories": 3,
+    "active_composer_scopes_without_advisories": 2,
+    "filemanager": "blocked optional component; advisories unresolved",
+    "vps_os_scanned": false
+  },
+  "remaining_work": [
+    "Real installation/upgrade and rollback acceptance",
+    "Cloud credentials, full SQL/application restore and RPO/RTO",
+    "Live WAF/Fail2Ban and protection beyond Apache",
+    "Active MFA seed encryption migration compatible with upstream upgrades",
+    "File Manager dependency migration",
+    "External alerts, signed provenance and external immutable anchoring",
+    "OpenLiteSpeed, site on-access AV GUI, full resource coverage, application/database HA, NoSQL GUI, advanced incremental snapshots, general feature toggles"
+  ],
+  "publication_note": "This evidence commit changes documentation/checksums only. Functional source is the commit above."
+}

@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-10-20T11:25:44.418009+00:00",
+  "installer_executed": false,
+  "vps_accessed": false,
+  "checks": [
+    {
+      "name": "bash -n hst-install.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-common.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-debian.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-ubuntu.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "PHP tests",
+      "status": "unavailable"
+    },
+    {
+      "name": "ShellCheck",
+      "status": "unavailable"
+    },
+    {
+      "name": "JavaScript syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Node project example syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-add-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-check-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-professional-mfa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Python syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Browser desktop and mobile",
+      "status": "unavailable"
+    }
+  ],
+  "python": {
+    "tests": 92,
+    "failures": 1,
+    "errors": 8,
+    "skipped": 14
+  },
+  "mode": "release",
+  "status": "incomplete-or-failed"
+}

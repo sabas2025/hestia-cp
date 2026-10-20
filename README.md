@@ -6,6 +6,8 @@
 
 ## Correções 1.1.1
 
+Veja a [auditoria final da versão publicada](AUDITORIA-FINAL-1.1.1.md): correções verificadas, CI aprovado, evidências e funcionalidades ainda pendentes. Nenhuma implantação na VPS foi executada.
+
 Consulte [as correções e mudanças de operação](CORRECOES-1.1.1.md), especialmente a recuperação de A2F e a quarentena do File Manager. As validações locais não substituem a homologação de serviços na VPS.
 
 ## Novidades da camada 1.1
