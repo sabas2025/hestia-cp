@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime, timezone
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import ssl
@@ -11,6 +12,30 @@ import sys
 from ops import atomic_json, command, config, require_root, utcnow
 import security
 from apply import verify_deployment
+
+def native_backups(root):
+    """Catalog evidence only; never label an archive restored or cloud-protected."""
+    result = {'catalogued': 0, 'accounts': [], 'local_present': 0, 'local_missing': 0,
+              'restoration_tested': False}
+    native = config(root / 'conf/hestia.conf')
+    folder = Path(native.get('BACKUP', '/backup'))
+    safe_folder = folder.is_absolute() and not folder.is_symlink() and not any(p.is_symlink() for p in folder.parents)
+    for path in sorted((root / 'data/users').glob('*/backup.conf')):
+        if path.is_symlink() or path.stat().st_size > 2097152: continue
+        owner = path.parent.name
+        if not re.fullmatch(r'[a-z][a-z0-9_]{1,29}', owner): continue
+        count = 0
+        for line in path.read_text().splitlines():
+            fields = dict(re.findall(r"([A-Z_]+)='([^'\r\n]*)'", line))
+            name = fields.get('BACKUP', '')
+            if not re.fullmatch(re.escape(owner)+r'\.\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.tar', name): continue
+            count += 1;result['catalogued'] += 1
+            if fields.get('TYPE') == 'local':
+                archive = folder/name
+                present = safe_folder and archive.is_file() and not archive.is_symlink() and archive.stat().st_size > 0
+                result['local_present' if present else 'local_missing'] += 1
+        if count: result['accounts'].append({'owner': owner, 'catalogued': count})
+    return result
 
 def collect(root=Path("/usr/local/hestia"), runner=command):
     conf = config(root / "conf/hestia.conf")
@@ -93,8 +118,14 @@ def collect(root=Path("/usr/local/hestia"), runner=command):
             stamp = datetime.fromisoformat(job.get('updated_at', '')).timestamp()
             stale_jobs += job.get('state') == 'running' and datetime.now(timezone.utc).timestamp() - stamp > 86400
         except (ValueError, OSError, TypeError): stale_jobs += 1
-    check('Tarefas de backup', 'warning' if failed or stale_jobs or not job_count else 'ok',
-          f'{failed} falhas e {stale_jobs} tarefas sem atualização; revise por conta' if job_count else 'Nenhuma execução registrada; configure e teste os backups')
+    native = native_backups(root)
+    data['backups'] = {'native': native, 'professional': {'jobs': job_count, 'failed': failed, 'stale': stale_jobs},
+                       'cloud_delivery_tested': False}
+    check('Backup nativo local', 'warning' if not native['catalogued'] or native['local_missing'] else 'ok',
+          f"{native['catalogued']} cópias catalogadas; {native['local_present']} arquivos locais presentes; {native['local_missing']} ausentes. Restauração não comprovada.")
+    check('Backup criptografado / nuvem', 'warning' if failed or stale_jobs or not job_count else 'ok',
+          f'{failed} falhas e {stale_jobs} tarefas sem atualização; confira destinos e última execução' if job_count else
+          'Nenhuma execução dos fluxos Professional registrada. Este aviso não invalida o backup nativo local.')
     data["status"] = "critical" if any(c["state"] == "critical" for c in data["checks"]) else "warning" if any(c["state"] == "warning" for c in data["checks"]) else "ok"
     return data
 

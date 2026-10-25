@@ -142,6 +142,17 @@ def quarantine_file_manager(root):
     st = conf.stat(); atomic_file(conf, text.encode(), st.st_mode & 0o777); os.chown(conf, st.st_uid, st.st_gid)
     return str(saved.relative_to(root))
 
+def source_files(source):
+    files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
+    files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
+    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-professional-editor', 'v-professional-platform', 'v-backup-user')]
+    files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php')]
+    files += [source / "web/css/themes/custom/professional.css"]
+    files += [source / 'professional/mfa-logrotate.conf']
+    files += [p for p in (source / "professional").glob("*") if p.suffix in (".py", ".service", ".timer", ".json") and p.is_file() and p.name != 'deployment.json'
+              and p.name not in EXPERIMENTAL and not any(tag in p.name for tag in ('enterprise', 'antivirus', 'cluster', 'incremental'))]
+    return files
+
 def apply_files(root, source, refresh=False, quarantine_filemanager=False):
     if root.is_symlink() or not (root / "web/inc/main.php").is_file():
         raise ValueError("Destination is not an installed Hestia tree")
@@ -187,14 +198,7 @@ def apply_files(root, source, refresh=False, quarantine_filemanager=False):
         if not quarantine_filemanager:
             raise ValueError('Existing File Manager requires review. Use --quarantine-filemanager to preserve it outside web root and disable its UI.')
         quarantine_file_manager(root)
-    files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
-    files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
-    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-backup-user')]
-    files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php')]
-    files += [source / "web/css/themes/custom/professional.css"]
-    files += [source / 'professional/mfa-logrotate.conf']
-    files += [p for p in (source / "professional").glob("*") if p.suffix in (".py", ".service", ".timer", ".json") and p.is_file() and p.name != 'deployment.json'
-              and p.name not in EXPERIMENTAL and not any(tag in p.name for tag in ('enterprise', 'antivirus', 'cluster', 'incremental'))]
+    files = source_files(source)
     for file in files:
         destination = root / file.relative_to(source)
         if destination.is_symlink() or any(p.is_symlink() for p in destination.parents): raise ValueError('Unsafe deployment target')

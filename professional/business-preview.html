@@ -18,10 +18,14 @@
 #business-status {padding:16px;border-left:4px solid #385de8;background:#eef2ff;overflow-wrap:anywhere;}
 .pro-business [hidden] {display:none!important;}
 @media(max-width:600px){.pro-business .pro-main{padding:16px;}.pro-business .pro-heading{display:block;}.pro-business h1{font-size:30px;}}
+
+.pro-code-editor{display:block;width:100%;min-height:26rem;resize:vertical;box-sizing:border-box;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9rem;line-height:1.5;tab-size:4;white-space:pre;overflow:auto;background:#111827;color:#e5e7eb;padding:1rem;border:1px solid #64748b;border-radius:.5rem}.pro-main pre{max-width:100%;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}.pro-main select,.pro-main input,.pro-main textarea{max-width:100%;box-sizing:border-box}
+
+@media(max-width:700px){.pro-main>.pro-heading{flex-wrap:wrap;align-items:flex-start}.pro-tools .pro-button{white-space:normal}}
 </style></head>
 <body class="pro-body pro-business"><main class="pro-main" id="business" data-token="PREVIEW_ONLY">
 <a class="pro-button" href="/professional/">← Central de hospedagem</a>
-<section class="pro-heading"><div><span class="pro-eyebrow">Mudanças com revisão</span><h1>Operações do servidor</h1><p class="pro-banner">Prévia ilustrativa · Nenhum servidor conectado · Nenhuma alteração aplicada</p><p>Prepare, revise e confirme cada alteração. Acompanhe a execução e a reversão.</p></div><span class="pro-pill">Hestia Professional 1.2</span></section>
+<section class="pro-heading"><div><span class="pro-eyebrow">Mudanças com revisão</span><h1>Operações do servidor</h1><p class="pro-banner">Prévia ilustrativa · Nenhum servidor conectado · Nenhuma alteração aplicada</p><p>Prepare, revise e confirme cada alteração. Acompanhe a execução e a reversão.</p></div><span class="pro-pill">Hestia Professional 1.3</span></section>
 <p class="pro-banner">Configuração aplicada exige validação de funcionamento. A fila executa no servidor e o histórico informa o resultado. Acesso SSH e recursos precisam de homologação com os serviços reais.</p>
 <div class="pro-columns"><section class="pro-card"><header><div><span class="pro-eyebrow">1 · Preparar</span><h2>Nova alteração</h2></div></header>
 <form id="change-form"><label for="owner">Conta responsável</label><input id="owner" required pattern="[a-z][a-z0-9_]{1,29}" maxlength="30" value="admin" >
@@ -76,7 +80,7 @@
     for (const entry of data.plans) {
       const row = document.createElement('div'); row.className = 'pro-operation';
       const text = document.createElement('p'); text.textContent = `${names[entry.action]} · ${entry.owner} · ${states[entry.state] || entry.state}${entry.job_state ? ' · fila: '+(states[entry.job_state] || entry.job_state) : ''}`; row.append(text);
-      if (!['queued','running','interrupted-review'].includes(entry.job_state) && ['planned','applied'].includes(entry.state)) {
+      if (!['queued','running','interrupted-review'].includes(entry.job_state) && ['planned','applied'].includes(entry.state) && (entry.state!=='applied'||entry.reversible!==false)) {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'pro-button'; button.textContent = entry.state === 'applied' ? 'Revisar reversão' : 'Revisar plano';
         button.addEventListener('click',() => { review(entry,entry.state === 'applied' ? 'rollback' : 'apply'); q('plan-summary').scrollIntoView({block:'center'}); }); row.append(button);
       }

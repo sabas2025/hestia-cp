@@ -1,6 +1,6 @@
 # HestiaCP Professional
 
-> Professional **1.2.0 — entrega parcial de operações empresariais (25/10/2026)**. Base HestiaCP 1.10.5. Consulte o [guia e os limites](EMPRESARIAL-1.2.md) e a [auditoria atual](AUDITORIA-1.2.md). Inclui GUI de operações, revisão com senha/A2F, fila, reversão, diagnóstico DNS/e-mail, cache público, políticas SSH e configuração de recursos. **Não foi implantado nem homologado na VPS; os demais módulos empresariais continuam pendentes.**
+> Professional **1.3.0 — ferramentas operacionais (25/10/2026)**. Base HestiaCP 1.10.5. Inclui editor online por conta, ferramentas Docker, ciclo de vida de projetos, WAF e backups com revisão por senha/A2F. Consulte [a entrega, a atualização e os limites](EMPRESARIAL-1.3.md). **Código publicado não significa configuração ou homologação na VPS; os requisitos empresariais ainda incompletos estão identificados no guia.**
 >
 > Para conexão de diagnóstico à VPS como root na porta 22, siga [CONEXAO-SSH.md](CONEXAO-SSH.md). Publicar este código no GitHub não instala o painel na VPS.
 >

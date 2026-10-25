@@ -2,7 +2,7 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Operações · Hestia Professional</title><link rel="stylesheet" href="/professional/dashboard.css"><script src="/professional/business.js" defer></script></head>
 <body class="pro-body pro-business"><main class="pro-main" id="business" data-token="<?= pro_escape($_SESSION['token']??'') ?>">
 <a class="pro-button" href="/professional/">← Central de hospedagem</a>
-<section class="pro-heading"><div><span class="pro-eyebrow">Mudanças com revisão</span><h1>Operações do servidor</h1><p>Prepare, revise e confirme cada alteração. Acompanhe a execução e a reversão.</p></div><span class="pro-pill">Hestia Professional 1.2</span></section>
+<section class="pro-heading"><div><span class="pro-eyebrow">Mudanças com revisão</span><h1>Operações do servidor</h1><p>Prepare, revise e confirme cada alteração. Acompanhe a execução e a reversão.</p></div><span class="pro-pill">Hestia Professional 1.3</span></section>
 <p class="pro-banner">Configuração aplicada exige validação de funcionamento. A fila executa no servidor e o histórico informa o resultado. Acesso SSH e recursos precisam de homologação com os serviços reais.</p>
 <?php if (!$identity['admin']): ?><p class="pro-muted">Sua conta precisa de delegação do administrador para alterar DNS, limite de e-mail ou cache.</p><?php endif; ?>
 <div class="pro-columns"><section class="pro-card"><header><div><span class="pro-eyebrow">1 · Preparar</span><h2>Nova alteração</h2></div></header>

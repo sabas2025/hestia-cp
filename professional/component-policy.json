@@ -1,5 +1,5 @@
 {
-  "overlay_version": "1.2.0",
+  "overlay_version": "1.3.0",
   "reviewed_at": "2026-10-25",
   "review_before": "2026-12-01",
   "hestia_supported": [
@@ -21,7 +21,7 @@
     "filemanager": {
       "approved": false,
       "reason": "Legacy Flysystem 1.x requires remediation and a reviewed build before activation",
-      "alternative": "reviewed code-server integration"
+      "alternative": "native account-scoped editor with MFA and private revisions"
     }
   }
 }

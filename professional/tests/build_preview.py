@@ -27,3 +27,10 @@ business = business.replace('<script src="/professional/business.js" defer></scr
 business = business.replace('</body>', '<script>' + (ROOT / 'web/professional/business.js').read_text() + '</script></body>')
 business = business.replace('<h1>Operações do servidor</h1>', '<h1>Operações do servidor</h1><p class="pro-banner">Prévia ilustrativa · Nenhum servidor conectado · Nenhuma alteração aplicada</p>')
 (ROOT / 'professional/business-preview.html').write_text(business)
+for tool in ('editor','platform'):
+    html=subprocess.check_output([php,'-n',str(ROOT/'professional/tests/render_tools_preview.php'),tool],text=True)
+    html=html.replace('<link rel="stylesheet" href="/professional/dashboard.css">','<style>'+(ROOT/'web/professional/dashboard.css').read_text()+'</style>')
+    html=html.replace(f'<script src="/professional/{tool}.js" defer></script>','')
+    html=html.replace('</body>','<script>'+(ROOT/f'web/professional/{tool}.js').read_text()+'</script></body>')
+    html=html.replace('<main class="pro-main"','<p class="pro-banner">Prévia ilustrativa · Nenhum servidor conectado · Nenhuma alteração aplicada</p><main class="pro-main"',1)
+    (ROOT/f'professional/{tool}-preview.html').write_text(html)

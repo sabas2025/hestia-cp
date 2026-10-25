@@ -23,7 +23,8 @@ from apply import atomic_file, verify_deployment
 from assistant import domain
 
 MARKER = '# HESTIA_PRO_BUSINESS_V1'
-ACTIONS = {'dns-ttl', 'mail-rate', 'cache-profile', 'ssh-policy', 'resources'}
+ACTIONS = {'dns-ttl', 'mail-rate', 'cache-profile', 'ssh-policy', 'resources',
+           'protection-profile','docker-operation','project-operation','cloud-operation','native-backup'}
 DELEGABLE = {'dns-ttl', 'mail-rate', 'cache-profile'}
 
 def run(args):
@@ -45,13 +46,15 @@ def regular(path, limit=2097152):
     for parent in path.parents:
         if not parent.exists(): continue
         st = parent.stat()
-        if st.st_uid != 0 or (st.st_mode & 0o022 and not st.st_mode & stat.S_ISVTX):
+        writable = st.st_mode & 0o002 or (st.st_mode & 0o020 and st.st_gid != 0)
+        if st.st_uid != 0 or (writable and not st.st_mode & stat.S_ISVTX):
             raise ValueError('Configuration parent must be root controlled')
     if not path.exists(): return None
     fd = os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
     try:
         st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_mode & 0o022 or st.st_nlink != 1 or st.st_size > limit:
+        writable = st.st_mode & 0o002 or (st.st_mode & 0o020 and st.st_gid != 0)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or writable or st.st_nlink != 1 or st.st_size > limit:
             raise ValueError('Configuration must be a bounded root-controlled regular file')
         with os.fdopen(fd,'rb',closefd=False) as stream: return stream.read(limit+1)
     finally: os.close(fd)
@@ -98,7 +101,11 @@ def pool_spec(fs, owner, name):
             'mode': 0o644, 'body': MARKER + '\n# ' + owner + '/' + name + '\n' +
             f'proxy_cache_path /var/cache/nginx/hestia-pro/{owner}/{name} levels=1:2 use_temp_path=off keys_zone=hpro_{name}:1m inactive=10m max_size=64m;\n'}
 
-def build(root, fs, action, owner, params):
+def build(root, fs, action, owner, params, actor=None):
+    if action in {'protection-profile','docker-operation','project-operation','cloud-operation','native-backup'}:
+        if actor is None:raise ValueError('Administrative actor required')
+        from control_plane import spec
+        return spec(root,fs,actor,action,owner,params)
     expected = {'dns-ttl': {'domain','value'}, 'mail-rate': {'domain','value'},
                 'cache-profile': {'domain','value'}, 'ssh-policy': {'value'},
                 'resources': {'uid','memory_mb','tasks','io_weight'}}
@@ -195,12 +202,13 @@ def load(root, ident): return json.loads(private_read(plan_path(root, ident),419
 def save(root, plan): root_json(plan_path(root,plan['id']),plan)
 def public(plan):
     result = {k:plan[k] for k in ('id','actor','owner','action','params','created','expires','state')}
-    result.update(notes=plan['spec']['notes'],files=plan['spec']['files'],commands=plan['spec']['forward'])
+    result.update(notes=plan['spec']['notes'],files=plan['spec']['files'],commands=plan['spec']['forward'],
+                  reversible=plan['spec'].get('reversible',True))
     return result
 
 def create(root, fs, actor, action, owner, params, now=None):
     now = time.time() if now is None else now
-    authorize(root,actor,action,owner); spec = build(root,fs,action,owner,params)
+    authorize(root,actor,action,owner); spec = build(root,fs,action,owner,params,actor)
     plan = {'id':secrets.token_hex(16),'actor':actor,'owner':owner,'action':action,'params':params,
             'created':now,'expires':now+600,'state':'planned','spec':spec,'before':snapshot(spec)}
     save(root,plan); return public(plan)
@@ -234,6 +242,7 @@ def execute(root, fs, actor, ident, rollback=False, runner=run, now=None):
         plan = load(root,ident); authorize(root,actor,plan['action'],plan['owner'])
         if actor != plan['actor']: raise ValueError('Plan belongs to another actor')
         if rollback:
+            if not plan['spec'].get('reversible',True):raise ValueError('This operation needs an explicit recovery plan')
             if plan['state'] != 'applied' or snapshot(plan['spec']) != plan.get('after'):
                 raise ValueError('Rollback requires unchanged applied configuration')
             plan['state'] = 'rolling-back'; save(root,plan)
@@ -243,7 +252,7 @@ def execute(root, fs, actor, ident, rollback=False, runner=run, now=None):
                 plan['state'] = 'recovery-required'; save(root,plan); raise
         else:
             if plan['state'] != 'planned' or plan['expires'] < now: raise ValueError('Plan expired or already used')
-            if build(root,fs,plan['action'],plan['owner'],plan['params']) != plan['spec'] or snapshot(plan['spec']) != plan['before']:
+            if build(root,fs,plan['action'],plan['owner'],plan['params'],actor) != plan['spec'] or snapshot(plan['spec']) != plan['before']:
                 raise ValueError('Configuration changed; create a new plan')
             plan['saved_files'] = []
             for item in plan['spec']['files']:

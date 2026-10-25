@@ -79,11 +79,19 @@ function pro_payload(array $identity, array $account, string $root, ?callable $r
         'cron' => ['v-list-cron-jobs', 'CRON_JOBS'],
         'backup' => ['v-list-user-backups', 'BACKUPS'],
     ];
-    $resources = [];
+    $resources = []; $nativeBackup = [];
     foreach ($definitions as $name => [$command, $permission]) {
         $enabled = ($account[$permission] ?? '0') !== '0';
         $objects = $enabled ? $runner($command, $owner) : [];
         $resources[$name] = ['enabled' => $enabled, 'count' => is_array($objects) ? count($objects) : null];
+        if ($name === 'backup' && is_array($objects)) {
+            foreach ($objects as $filename => $row) {
+                if (!is_string($filename) || !str_starts_with($filename, $owner . '.') || !is_array($row)) { continue; }
+                $nativeBackup[] = ['file'=>$filename, 'type'=>(string)($row['TYPE']??''),
+                    'date'=>(string)($row['DATE']??''), 'time'=>(string)($row['TIME']??''),
+                    'web'=>(string)($row['WEB']??''), 'mail'=>(string)($row['MAIL']??''), 'db'=>(string)($row['DB']??'')];
+            }
+        }
     }
     $task = pro_snapshot($root . '/data/professional/jobs/' . $owner . '.json');
     if ($task !== null && ($task['user'] ?? '') !== $owner) { $task = null; }
@@ -138,7 +146,7 @@ function pro_payload(array $identity, array $account, string $root, ?callable $r
         'disk' => (string)($account['U_DISK'] ?? '0'),
         'disk_limit' => (string)($account['DISK_QUOTA'] ?? 'unknown'),
         'health' => $health,
-        'job' => $task, 'last_backup' => $lastBackup, 'last_drill' => $lastDrill,
+        'job' => $task, 'last_backup' => $lastBackup, 'last_drill' => $lastDrill, 'native_backups' => $nativeBackup,
         'backup_freshness' => $backupState,
         'generated_at' => gmdate('c')];
 }
