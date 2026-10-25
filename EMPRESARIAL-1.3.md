@@ -33,6 +33,14 @@ SHA-256 de `SHA256SUMS`: `b8af0f75529e1bba0dc3fa07a15b7c88bea603f118f99cecdf2f24
 A revisão posterior fixa o bootstrap nessa fonte e acrescenta testes de encerramento
 da tarefa. A CI também baixa e verifica o ZIP imutável sem acessar a VPS.
 
+Correção do bootstrap: as execuções do código baixado usam `-B`, pois importações
+Python podem criar `__pycache__` e invalidar uma conferência posterior do inventário.
+Um cache recusado é preservado integralmente em
+`/var/lib/hestia-professional-upgrade/quarantine`, antes de baixar e verificar outra
+cópia da mesma fonte fixada. Arquivos extras não são ignorados. A recuperação do
+cache é recusada enquanto houver uma tarefa pendente/em execução.
+O `plan` informa o motivo concreto do preflight e retorna código 1 quando bloqueado.
+
 ```bash
 /usr/local/sbin/hestia-professional-update plan
 /usr/local/sbin/hestia-professional-update apply

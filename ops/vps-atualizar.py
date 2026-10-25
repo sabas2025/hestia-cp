@@ -15,6 +15,7 @@ import shutil
 import stat
 import subprocess
 import sys
+sys.dont_write_bytecode = True
 import tempfile
 import time
 import urllib.request
@@ -91,7 +92,9 @@ def checked(args, timeout=60, log=None):
         raise RuntimeError('Command failed; inspect private VPS log')
     return text
 
-def verify_bundle(folder, sums_hash=SUMS_SHA256, expected=EXPECTED_FILES):
+def verify_bundle(folder, sums_hash=None, expected=None):
+    sums_hash=SUMS_SHA256 if sums_hash is None else sums_hash
+    expected=EXPECTED_FILES if expected is None else expected
     sums = read_file(folder/'SHA256SUMS',secret=False,limit=1048576)
     if hashlib.sha256(sums).hexdigest()!=sums_hash: raise ValueError('Unapproved checksum manifest')
     names = {'SHA256SUMS'}
@@ -103,7 +106,10 @@ def verify_bundle(folder, sums_hash=SUMS_SHA256, expected=EXPECTED_FILES):
         data = read_file(folder/name,secret=False,limit=67108864)
         if hashlib.sha256(data).hexdigest()!=digest: raise ValueError('Source checksum mismatch')
     actual = {str(p.relative_to(folder)) for p in folder.rglob('*') if p.is_file()}
-    if actual!=names or len(names)!=expected: raise ValueError('Unexpected source files')
+    if actual!=names or len(names)!=expected:
+        raise ValueError('Unexpected source files: '+json.dumps({
+            'expected':expected,'manifest':len(names),'actual':len(actual),
+            'missing':sorted(names-actual)[:10],'extra':sorted(actual-names)[:10]}))
 
 def unpack(data, target):
     if len(data)>52428800: raise ValueError('Oversized ZIP')
@@ -135,7 +141,20 @@ def bundle():
     if not re.fullmatch(r'[a-f0-9]{40}',SOURCE) or not re.fullmatch(r'[a-f0-9]{64}',SUMS_SHA256):
         raise ValueError('Release has no approved source pin')
     parent=private_dir(STATE/'sources');target=parent/SOURCE
-    if target.exists():verify_bundle(target);return target
+    if target.exists():
+        controlled(target)
+        if not target.is_dir():raise ValueError('Source cache is not a directory')
+        try:verify_bundle(target);return target
+        except (ValueError,OSError) as error:
+            # Preserve an invalid cache in full; never ignore extra files or weaken hashes.
+            if (STATE/'job.json').exists():
+                old=read_json(STATE/'job.json')
+                if old.get('state') in ('queued','running'):
+                    raise ValueError('Invalid source cache while an update task is pending; inspect before recovery') from error
+            saved=private_dir(STATE/'quarantine')/(SOURCE+'-'+secrets.token_hex(8))
+            target.rename(saved)
+            write_json(STATE/'source-cache-recovery.json',{'source':SOURCE,'preserved':str(saved),
+                       'reason':str(error)[:2000],'at':time.time()})
     request=urllib.request.Request('https://codeload.github.com/sabas2025/hestia-cp/zip/'+SOURCE)
     opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with opener.open(request,timeout=90) as response:
@@ -160,6 +179,37 @@ def components(value):
     if len(set(names))!=len(names) or set(names)-{'backup','waf','docker','node'}:raise ValueError('Unknown component')
     return names
 
+# The pinned core's CLI hides preflight exceptions. This read-only wrapper reports
+# the actual blocker, without running apply(), disabling integrity or printing file contents.
+PLAN_CODE = r'''
+import json,sys
+from pathlib import Path
+sys.dont_write_bytecode=True
+source=Path(sys.argv[2]);sys.path.insert(0,str(source/'professional'))
+import upgrade
+original=upgrade.regular
+def checked_file(path,*args):
+    try:return original(path,*args)
+    except (ValueError,OSError) as error:
+        raise ValueError('Target blocked: '+str(path)+'; '+str(error)) from error
+upgrade.regular=checked_file
+root=Path('/usr/local/hestia')
+try:result=upgrade.preflight(root,source)
+except Exception as error:
+    result={'state':'blocked','phase':'installed-preflight','error':type(error).__name__,'reason':str(error)[:2000]}
+    try:
+        integrity=upgrade.overlay.verify_deployment(root)
+        if integrity.get('state')!='verified':result['integrity']=integrity
+    except Exception:pass
+print(json.dumps(result,ensure_ascii=False))
+'''
+
+def inspect_plan(source,runner=checked):
+    result=json.loads(runner(['/usr/bin/python3','-I','-B','-c',PLAN_CODE,'plan',str(source)]))
+    if not isinstance(result,dict) or result.get('state') not in ('ready','blocked'):
+        raise ValueError('Invalid preflight response')
+    return result
+
 def status():
     if not (STATE/'job.json').exists():return {'state':'not-started','source':SOURCE}
     job=read_json(STATE/'job.json')
@@ -171,8 +221,8 @@ def status():
 def start(selected,recovery,runner=checked,loader=bundle):
     names=components(selected);recovery=cidr(recovery) if 'waf' in names else None
     source=loader()
-    plan=json.loads(runner(['/usr/bin/python3','-I',str(source/'professional/upgrade.py'),'plan','--source',str(source)]))
-    if plan.get('state')!='ready':raise ValueError('Installed tree not ready for upgrade')
+    plan=inspect_plan(source,runner)
+    if plan.get('state')!='ready':raise ValueError('Installed tree blocked: '+plan.get('reason','inspect plan'))
     with locked():
         if (STATE/'job.json').exists():
             old=read_json(STATE/'job.json')
@@ -190,9 +240,9 @@ def start(selected,recovery,runner=checked,loader=bundle):
             runner(['/usr/bin/systemd-run','--quiet','--collect','--no-block','--unit='+unit,
                     '--property=Type=exec','--property=User=root','--property=Group=root','--property=UMask=0077',
                     '--property=RuntimeMaxSec=5400','--property=KillMode=control-group',
-                    '--property=ExecStopPost=/usr/bin/python3 -I '+str(HELPER)+' _cleanup --nonce '+nonce,
+                    '--property=ExecStopPost=/usr/bin/python3 -I -B '+str(HELPER)+' _cleanup --nonce '+nonce,
                     '--property=StandardOutput=null','--property=StandardError=null','--',
-                    '/usr/bin/python3','-I',str(HELPER),'_worker','--nonce',nonce])
+                    '/usr/bin/python3','-I','-B',str(HELPER),'_worker','--nonce',nonce])
         except Exception:job['state']='launch-failed';write_json(STATE/'job.json',job);raise
         return {'state':'queued','unit':unit,'source':SOURCE,'installer_executed':False}
 
@@ -203,13 +253,13 @@ def worker(nonce,runner=checked,loader=bundle):
         job.update(state='running',updated=time.time());write_json(STATE/'job.json',job)
     try:
         source=loader();job['results']={}
-        result=runner(['/usr/bin/python3','-I',str(source/'professional/upgrade.py'),'apply','--source',str(source)],timeout=600)
+        result=runner(['/usr/bin/python3','-I','-B',str(source/'professional/upgrade.py'),'apply','--source',str(source)],timeout=600)
         upgrade=json.loads(result)
         if upgrade.get('state')!='succeeded':raise ValueError('Overlay did not finish successfully')
         job.update(overlay_updated=True,phase='prerequisites',updated=time.time())
         job['results']['overlay']=upgrade;write_json(STATE/'job.json',job)
         if job['components']:
-            args=['/usr/bin/python3','-I',str(source/'professional/dependencies.py'),'--components',','.join(job['components'])]
+            args=['/usr/bin/python3','-I','-B',str(source/'professional/dependencies.py'),'--components',','.join(job['components'])]
             if job['admin_cidr']:args+=['--admin-cidr',job['admin_cidr']]
             result=json.loads(runner(args,timeout=4500))
             if result.get('state')!='succeeded':raise ValueError('Prerequisites did not finish')
@@ -241,17 +291,20 @@ def main():
     if os.geteuid()!=0:raise ValueError('Root console required')
     if args.action=='status':result=status()
     elif args.action=='plan':
-        source=bundle();result=json.loads(checked(['/usr/bin/python3','-I',str(source/'professional/upgrade.py'),'plan','--source',str(source)]))
-        names=components(args.components);result['components']=names
-        if 'waf' in names:result['admin_cidr']=cidr(args.admin_cidr)
+        source=bundle();result=inspect_plan(source)
+        if result['state']=='ready':
+            names=components(args.components);result['components']=names
+            if 'waf' in names:result['admin_cidr']=cidr(args.admin_cidr)
     elif args.action=='apply':result=start(args.components,args.admin_cidr)
     elif args.action=='_worker':result=worker(args.nonce)
     else:result=cleanup(args.nonce)
     print(json.dumps(result,ensure_ascii=False))
+    return 1 if result.get('state')=='blocked' else 0
 
 if __name__=='__main__':
-    try:main()
-    except Exception:
-        print(json.dumps({'state':'refused-or-failed','message':'Confira status e os registros privados em /var/lib/hestia-professional-upgrade e /usr/local/hestia/data/professional-dependencies. Não execute o instalador novamente.'},ensure_ascii=False))
+    try:sys.exit(main())
+    except Exception as error:
+        print(json.dumps({'state':'refused-or-failed','error':type(error).__name__,'reason':str(error)[:2000],
+                          'message':'Confira os registros privados em /var/lib/hestia-professional-upgrade. Não execute o instalador novamente.'},ensure_ascii=False))
         sys.exit(1)
 
