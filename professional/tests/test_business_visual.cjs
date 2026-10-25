@@ -18,7 +18,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
         if (request.method() === 'GET') { await route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'professional/business-preview.html'),'utf8')}); return; }
         const fields=new URLSearchParams(request.postData()); assert.equal(fields.get('token'),'PREVIEW_ONLY');
         const op=fields.get('op'), input=JSON.parse(fields.get('request')); let data;
-        if (op==='plan') { plan={id:'a'.repeat(32),action:input.action,owner:input.owner,params:input.params,state:'planned',notes:['Illustrative plan; native operations are mocked.'],files:[],commands:[]}; data=plan; }
+        if (op==='plan') { plan={id:'a'.repeat(32),action:input.action,owner:input.owner,params:input.params,state:'planned',notes:['Plano ilustrativo. Os serviços e a fila são simulados neste teste.'],files:[],commands:[]}; data=plan; }
         else if (op==='apply') { assert.equal(input.password,'synthetic-password');assert.equal(input.code,'123456'); state='applied'; data={...plan,state:'queued'}; }
         else if (op==='rollback') { state='rolled-back';data={...plan,state:'queued'}; }
         else if (op==='history') data={plans:plan?[{...plan,state}]:[]};
@@ -37,9 +37,9 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       await page.locator('#password').fill('synthetic-password');await page.locator('#code').fill('123456');await page.locator('#confirm').click();
       await page.waitForFunction(()=>document.querySelector('#business-status').textContent.includes('colocada na fila'));
       assert.equal(await page.locator('#password').inputValue(),''); assert.equal(await page.locator('#code').inputValue(),'');
-      assert.ok((await page.locator('#history-list').textContent()).includes('applied'));
+      assert.ok((await page.locator('#history-list').textContent()).includes('Aplicado'));
       await page.getByRole('button',{name:'Revisar reversão'}).click();await page.locator('#password').fill('synthetic-password');await page.locator('#code').fill('654321');await page.locator('#confirm').click();
-      await page.waitForFunction(()=>document.querySelector('#history-list').textContent.includes('rolled-back'));
+      await page.waitForFunction(()=>document.querySelector('#history-list').textContent.includes('Revertido'));
       assert.deepEqual(errors,[]);results.push({width,overflow:false,review:'passed',queue:'mocked',rollback:'mocked',js_errors:0});await page.close();
     }
   } finally {await browser.close();}

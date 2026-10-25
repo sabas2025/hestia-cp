@@ -1,3 +1,5 @@
+> Registro histórico. Para a revisão atual, veja [EMPRESARIAL-1.2.md](EMPRESARIAL-1.2.md) e [AUDITORIA-1.2.md](AUDITORIA-1.2.md).
+
 # Registro das alterações — HestiaCP Professional 1.0.0
 
 Data: 15/10/2026. Base: HestiaCP 1.10.5. As alterações foram aplicadas ao código deste pacote; nenhuma VPS foi acessada ou modificada.

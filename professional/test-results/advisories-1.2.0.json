@@ -1,0 +1,33 @@
+{
+  "queried_at": "2026-10-25T06:09:28.177499+00:00",
+  "service": "OSV querybatch",
+  "unique_locked_versions": 595,
+  "findings": [
+    {
+      "ecosystem": "composer",
+      "name": "league/flysystem",
+      "version": "1.1.10",
+      "ids": [
+        "GHSA-cxf4-7mrp-vvpr"
+      ],
+      "deployment": [
+        "blocked-optional"
+      ]
+    },
+    {
+      "ecosystem": "composer",
+      "name": "phpseclib/phpseclib",
+      "version": "2.0.55",
+      "ids": [
+        "GHSA-q97c-8qh3-fpc6"
+      ],
+      "deployment": [
+        "blocked-optional"
+      ]
+    }
+  ],
+  "active_findings": 0,
+  "status": "passed-with-blocked-component-findings",
+  "vps_packages_checked": false,
+  "unknown_vulnerabilities_excluded": false
+}

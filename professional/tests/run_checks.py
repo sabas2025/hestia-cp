@@ -48,6 +48,9 @@ def main():
     if os.environ.get('NGINX_BINARY') or shutil.which('nginx'):
         run('Nginx public cache template validation',[sys.executable,str(ROOT/'professional/tests/validate_cache.py')])
     else:result['checks'].append({'name':'Nginx public cache template validation','status':'unavailable'})
+    if os.environ.get('SSHD_BINARY') or shutil.which('sshd'):
+        run('OpenSSH generated policy validation',[sys.executable,str(ROOT/'professional/tests/validate_ssh.py')])
+    else:result['checks'].append({'name':'OpenSSH generated policy validation','status':'unavailable'})
     if node and os.environ.get('PLAYWRIGHT_MODULE') and os.environ.get('CHROME_BIN'):
         run('Generate preview from current PHP',[sys.executable,str(ROOT/'professional/tests/build_preview.py')])
         run('Browser desktop and mobile',[node,str(ROOT/'professional/tests/test_visual.cjs')])

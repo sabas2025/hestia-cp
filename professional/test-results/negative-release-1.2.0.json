@@ -1,0 +1,95 @@
+{
+  "generated_at": "2026-10-25T06:12:40.332989+00:00",
+  "installer_executed": false,
+  "vps_accessed": false,
+  "checks": [
+    {
+      "name": "bash -n hst-install.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-common.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-debian.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-ubuntu.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "PHP tests",
+      "status": "unavailable"
+    },
+    {
+      "name": "ShellCheck",
+      "status": "unavailable"
+    },
+    {
+      "name": "Node/JavaScript",
+      "status": "unavailable"
+    },
+    {
+      "name": "Bash MFA syntax v-add-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-check-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-professional-mfa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Python syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Nginx public cache template validation",
+      "status": "unavailable"
+    },
+    {
+      "name": "OpenSSH generated policy validation",
+      "status": "unavailable"
+    },
+    {
+      "name": "Browser desktop and mobile",
+      "status": "unavailable"
+    }
+  ],
+  "python": {
+    "tests": 127,
+    "failures": 3,
+    "errors": 11,
+    "skipped": 14
+  },
+  "mode": "release",
+  "status": "incomplete-or-failed"
+}

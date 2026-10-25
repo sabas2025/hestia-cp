@@ -1,10 +1,15 @@
 <?php
 declare(strict_types=1);
 if (!defined('HST_PRO_BUSINESS')) { http_response_code(403); exit; }
+function pro_business_encode(array $request): string {
+    // PHP encodes an empty associative array as []; the Python protocol requires {}.
+    $encoded = json_encode((object)$request, JSON_THROW_ON_ERROR);
+    if (strlen($encoded)>16384) { throw new RuntimeException('Oversized request'); }
+    return $encoded;
+}
 function pro_business_call(string $actor, string $op, array $request): array {
     if (!preg_match('/\A[a-z][a-z0-9_]{1,29}\z/D', $actor) || !in_array($op, ['plan','apply','rollback','history','diagnose','coverage'], true)) { throw new RuntimeException('Invalid operation'); }
-    $encoded = json_encode($request, JSON_THROW_ON_ERROR);
-    if (strlen($encoded)>16384) { throw new RuntimeException('Oversized request'); }
+    $encoded = pro_business_encode($request);
     $pipes = [];
     $process = proc_open(['/usr/bin/sudo','-n',HESTIA_DIR_BIN.'v-professional-business',$actor,$op],
         [0=>['pipe','r'],1=>['pipe','w'],2=>['file','/dev/null','w']],$pipes);

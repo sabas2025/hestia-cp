@@ -1,0 +1,26 @@
+[
+  {
+    "width": 360,
+    "overflow": false,
+    "review": "passed",
+    "queue": "mocked",
+    "rollback": "mocked",
+    "js_errors": 0
+  },
+  {
+    "width": 768,
+    "overflow": false,
+    "review": "passed",
+    "queue": "mocked",
+    "rollback": "mocked",
+    "js_errors": 0
+  },
+  {
+    "width": 1440,
+    "overflow": false,
+    "review": "passed",
+    "queue": "mocked",
+    "rollback": "mocked",
+    "js_errors": 0
+  }
+]

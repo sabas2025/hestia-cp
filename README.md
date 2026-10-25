@@ -1,4 +1,5 @@
-> Pacote modificado HestiaCP Professional 1.1.1 (19/10/2026), baseado na revisão registrada em [UPSTREAM.json](UPSTREAM.json). Comece por [PROFISSIONAL.md](PROFISSIONAL.md) e consulte [ENTREGA.md](ENTREGA.md) para alterações, testes e limites. Não é uma release oficial do HestiaCP.
+> Professional **1.2.0 — entrega parcial de operações empresariais (25/10/2026)**. Base HestiaCP 1.10.5. Consulte o [guia e os limites](EMPRESARIAL-1.2.md) e a [auditoria atual](AUDITORIA-1.2.md). Inclui GUI de operações, revisão com senha/A2F, fila, reversão, diagnóstico DNS/e-mail, cache público, políticas SSH e configuração de recursos. **Não foi implantado nem homologado na VPS; os demais módulos empresariais continuam pendentes.**
+
 >
 > Para conexão de diagnóstico à VPS como root na porta 22, siga [CONEXAO-SSH.md](CONEXAO-SSH.md). Publicar este código no GitHub não instala o painel na VPS.
 >

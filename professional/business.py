@@ -115,12 +115,12 @@ def build(root, fs, action, owner, params):
             if not before.isdigit(): raise ValueError('Native TTL unavailable')
             spec['watch'].append(str(base/'dns'/(name+'.conf')))
             command = 'v-change-dns-domain-ttl'
-            spec['notes'].append('TTL reversion updates the DNS serial; propagation requires external validation.')
+            spec['notes'].append('A reversão do TTL atualiza o serial DNS. A propagação precisa de validação externa.')
         elif action == 'mail-rate':
             new = integer(params['value'], 1, 10000); before = old.get('RATE_LIMIT') or 'system'
             if before != 'system' and not before.isdigit(): raise ValueError('Native mail rate unavailable')
             command = 'v-change-mail-domain-rate-limit'
-            spec['notes'].append('Per-mailbox overrides remain authoritative; delivery and reputation require real tests.')
+            spec['notes'].append('Limite padrão por caixa postal, não agregado do domínio. Exceções individuais prevalecem; entrega e reputação exigem testes reais.')
         else:
             live = config(root/'conf/hestia.conf'); new = params['value']; before = old.get('PROXY','')
             if live.get('WEB_SYSTEM') != 'apache2' or live.get('PROXY_SYSTEM') != 'nginx':
@@ -139,7 +139,7 @@ def build(root, fs, action, owner, params):
             spec['forward'] = [[str(root/'bin/v-change-web-domain-proxy-tpl'), owner, name, new, extensions, 'no']]
             spec['reverse'] = [[str(root/'bin/v-change-web-domain-proxy-tpl'), owner, name, before, extensions, 'no']]
             spec['validate'] = [['/usr/sbin/nginx','-t']]; spec['reload'] = [['/usr/bin/systemctl','reload','nginx']]
-            spec['notes'].append('Public responses only; cookies, authentication, query strings and sensitive routes bypass cache. Verify application behavior and cache hits.')
+            spec['notes'].append('Cache de respostas públicas: cookies, autenticação, parâmetros na URL e rotas sensíveis ficam fora. Valide a aplicação e os acertos de cache.')
         if action != 'cache-profile':
             spec['forward'] = [[str(root/'bin'/command), owner, name, str(new)]]
             spec['reverse'] = [[str(root/'bin'/command), owner, name, before]]
@@ -164,7 +164,7 @@ def build(root, fs, action, owner, params):
         body += 'Match all\n'
         spec['files'].append({'path':str(fs/'etc/ssh/sshd_config.d'/('80-hestia-pro-'+owner+'.conf')), 'mode':0o600,'body':body})
         spec['validate'] = [['/usr/sbin/sshd','-t']]; spec['reload'] = [['/usr/bin/systemctl','reload','ssh']]
-        spec['notes'].append('SFTP-only does not create a chroot. Maintain a console and test a new SSH connection before closing the current one.')
+        spec['notes'].append('Somente SFTP não cria chroot. Mantenha acesso ao console e teste outra conexão SSH antes de encerrar a atual.')
     else:
         uid = integer(params['uid'],1000,2147483647)
         if pwd.getpwnam(owner).pw_uid != uid: raise ValueError('UID does not match account')
@@ -173,7 +173,7 @@ def build(root, fs, action, owner, params):
         body = MARKER + f'\n[Slice]\nMemoryAccounting=yes\nMemoryMax={memory}M\nTasksMax={tasks}\nIOAccounting=yes\nIOWeight={weight}\n'
         spec['files'].append({'path':str(fs/f'etc/systemd/system/user-{uid}.slice.d/80-hestia-pro.conf'),'mode':0o644,'body':body})
         spec['reload'] = [['/usr/bin/systemctl','daemon-reload']]
-        spec['notes'].append('Only processes inside this user slice are covered. Native CPUQuota/MemoryHigh remain unchanged. Existing PHP, mail, databases and Docker may be outside the slice; daemon-reload does not migrate or restart them.')
+        spec['notes'].append('Abrange processos na slice do usuário. CPUQuota e MemoryHigh nativos são preservados. PHP, e-mail, bancos e Docker podem ficar fora; daemon-reload não move nem reinicia processos.')
     for item in spec['files']:
         previous = regular(item['path'])
         if previous is not None and not previous.startswith((MARKER+'\n').encode()):
@@ -280,8 +280,10 @@ def enqueue(root, actor, ident, rollback=False, runner=run, now=None):
         if actor != plan['actor'] or plan['state'] != ('applied' if rollback else 'planned') or (not rollback and plan['expires'] < now):
             raise ValueError('Plan unavailable')
         ticket = folder(root)/'queue'/(ident+'.json')
-        if ticket.exists() and json.loads(private_read(ticket)).get('state') in ('queued','running'):
-            raise ValueError('Operation already queued')
+        if ticket.exists():
+            old = json.loads(private_read(ticket))
+            if old.get('state') == 'running' or (old.get('state') == 'queued' and old.get('expires',0) >= now):
+                raise ValueError('Operation already queued')
         nonce = secrets.token_hex(16)
         job = {'actor':actor,'id':ident,'rollback':rollback,'nonce':nonce,'expires':now+60,'state':'queued'}
         root_json(ticket,job)
@@ -317,8 +319,11 @@ def history(root, actor):
         if plan['actor'] != actor: continue
         result = public(plan); ticket = folder(root)/'queue'/path.name
         if ticket.exists():
-            state = json.loads(private_read(ticket)).get('state')
-            if state in ('queued','running','queue-failed','job-failed'): result['job_state'] = state
+            job = json.loads(private_read(ticket)); state = job.get('state')
+            if state in ('queued','running','queue-failed','job-failed'):
+                result['job_state'] = state
+                if state == 'queued' and job.get('expires',0) < time.time(): result['job_state'] = 'queue-expired'
+                if state == 'running' and job.get('expires',0)+600 < time.time(): result['job_state'] = 'interrupted-review'
         output.append(result)
     return {'plans':output}
 

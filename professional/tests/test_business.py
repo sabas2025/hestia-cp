@@ -1,6 +1,9 @@
 """Operation boundaries and failure recovery. Native daemons are mocked explicitly."""
 from datetime import datetime, timedelta, timezone
 import json
+import io
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -168,6 +171,44 @@ class BusinessTests(unittest.TestCase):
         p=self.plan();b.enqueue(self.root,'admin',p['id'],runner=lambda a:'',now=1001)
         ticket=json.loads((b.folder(self.root)/'queue'/(p['id']+'.json')).read_text())
         with self.assertRaises(ValueError): b.work(self.root,self.fs,p['id'],ticket['nonce'],self.runner,lambda r:{'state':'review-required'},1002)
+    def test_queue_rechecks_actor_after_submission(self):
+        p=self.plan();b.enqueue(self.root,'admin',p['id'],runner=lambda a:'',now=1001)
+        ticket=json.loads((b.folder(self.root)/'queue'/(p['id']+'.json')).read_text())
+        path=self.root/'data/users/admin/user.conf';path.write_text("ROLE='user'\nSUSPENDED='no'\n")
+        with self.assertRaises(ValueError):b.work(self.root,self.fs,p['id'],ticket['nonce'],self.runner,lambda r:{'state':'verified'},1002)
+    def test_requeued_expired_ticket_invalidates_old_worker_nonce(self):
+        p=self.plan();b.enqueue(self.root,'admin',p['id'],runner=lambda a:'',now=1001)
+        first=json.loads((b.folder(self.root)/'queue'/(p['id']+'.json')).read_text())
+        b.enqueue(self.root,'admin',p['id'],runner=lambda a:'',now=1062)
+        second=json.loads((b.folder(self.root)/'queue'/(p['id']+'.json')).read_text())
+        self.assertNotEqual(first['nonce'],second['nonce'])
+        with self.assertRaises(ValueError):b.work(self.root,self.fs,p['id'],first['nonce'],self.runner,lambda r:{'state':'verified'},1063)
+        b.work(self.root,self.fs,p['id'],second['nonce'],self.runner,lambda r:{'state':'verified'},1063)
+    def test_cli_requires_real_fresh_totp_before_enqueue(self):
+        import mfa
+        p=self.plan();now=1800000000
+        code=mfa.totp('JBSWY3DPEHPK3PXP',now//30)
+        request={'id':p['id'],'password':'synthetic-password','code':code}
+        def reauth(root,user,action,req):
+            return mfa.operate(root,user,action,req,verifier=lambda u,pw:pw=='synthetic-password',now=now)
+        argv=['business.py','--root',str(self.root),'--actor','admin','--op','apply']
+        with patch('sys.argv',argv),patch('sys.stdin',io.StringIO(json.dumps(request))),patch('sys.stdout',io.StringIO()),patch('business.verify_deployment',return_value={'state':'verified'}),patch('business.reauthenticate',side_effect=reauth),patch('business.enqueue',return_value={'state':'queued'}) as enqueue:
+            b.main();enqueue.assert_called_once()
+        # The same TOTP cannot authorize another queue submission.
+        with patch('sys.argv',argv),patch('sys.stdin',io.StringIO(json.dumps(request))),patch('business.verify_deployment',return_value={'state':'verified'}),patch('business.reauthenticate',side_effect=reauth),patch('business.enqueue') as enqueue:
+            with self.assertRaises(ValueError):b.main()
+            enqueue.assert_not_called()
+    def test_empty_php_request_reaches_python_history_as_object(self):
+        # Exercise the real client serializer and Python entry protocol together.
+        php=os.environ.get('PHP_BINARY','php')
+        file=str(ROOT/'web/professional/business-client.php')
+        code='define("HST_PRO_BUSINESS",true);require '+json.dumps(file)+';echo pro_business_encode([]);'
+        wire=subprocess.check_output([php,'-n','-r',code],text=True)
+        self.assertIsInstance(json.loads(wire),dict)
+        stdout=io.StringIO()
+        with patch('sys.argv',['business.py','--root',str(self.root),'--actor','admin','--op','history']),patch('sys.stdin',io.StringIO(wire)),patch('sys.stdout',stdout):
+            b.main()
+        self.assertEqual(json.loads(stdout.getvalue()),{'plans':[]})
     def test_diagnosis_is_read_only_and_limited(self):
         calls=[]
         def runner(args,timeout):calls.append(args);return 0,'"v=spf1 -all"\n' if args[-2:] == ['example.com','TXT'] else ''

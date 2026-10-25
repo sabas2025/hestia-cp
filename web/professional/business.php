@@ -22,8 +22,8 @@ if ($method==='POST') {
     try {
         $raw=$_POST['request']??''; $op=$_POST['op']??'';
         if (!is_string($raw) || strlen($raw)>16384 || !is_string($op)) { throw new RuntimeException('Invalid request'); }
+        if (!(json_decode($raw,false,16,JSON_THROW_ON_ERROR) instanceof stdClass)) { throw new RuntimeException('Invalid request'); }
         $request=json_decode($raw,true,16,JSON_THROW_ON_ERROR);
-        if (!is_array($request)) { throw new RuntimeException('Invalid request'); }
         $result=pro_business_call($identity['owner'],$op,$request);
         echo json_encode($result,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR);
     } catch (Throwable $e) { http_response_code(400); echo '{"error":"Operação recusada. Confira a delegação, a senha, um novo código A2F e o histórico. Se a configuração mudou, crie outro plano."}'; }

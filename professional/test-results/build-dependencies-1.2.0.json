@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-10-25T06:09:39.682654+00:00",
+  "node_runtime": "24.22.1",
+  "npm_runtime": "11.9.0",
+  "build": "passed",
+  "documentation_tests": {
+    "tests": 8,
+    "status": "passed"
+  },
+  "documentation_build": "passed",
+  "npm_audit": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "dependencies": {
+      "prod": 39,
+      "dev": 482,
+      "optional": 104,
+      "peer": 1,
+      "peerOptional": 0,
+      "total": 520
+    }
+  },
+  "native_services_executed": false
+}

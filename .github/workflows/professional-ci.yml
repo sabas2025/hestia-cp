@@ -14,10 +14,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
       - name: Install QA tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y php8.3-cli python3-qrcode python3-cryptography shellcheck nodejs npm zstd composer nginx
+          sudo apt-get install -y php8.3-cli python3-qrcode python3-cryptography shellcheck zstd composer nginx openssh-server
+          sudo mkdir -p /run/sshd
           npm ci --ignore-scripts --prefix professional/tests/browser
           professional/tests/browser/node_modules/.bin/playwright install --with-deps chromium
       - name: Fetch exact Composer-locked TOTP library for the isolated test
@@ -29,7 +33,7 @@ jobs:
       - name: Mandatory tests without skipped checks
         run: |
           browser_path=$(node -e 'process.stdout.write(require("./professional/tests/browser/node_modules/playwright").chromium.executablePath())')
-          sudo env PHP_BINARY=/usr/bin/php8.3 SHELLCHECK_BINARY=/usr/bin/shellcheck NGINX_BINARY=/usr/sbin/nginx \
+          sudo env PATH="$PATH" PHP_BINARY=/usr/bin/php8.3 SHELLCHECK_BINARY=/usr/bin/shellcheck NGINX_BINARY=/usr/sbin/nginx SSHD_BINARY=/usr/sbin/sshd \
             TWOFA_LIBRARY_ROOT="$GITHUB_WORKSPACE/.qa/twofactor/lib" \
             PLAYWRIGHT_MODULE="$GITHUB_WORKSPACE/professional/tests/browser/node_modules/playwright" \
             CHROME_BIN="$browser_path" /usr/bin/python3 professional/tests/run_checks.py --output /tmp/hestia-verification.json
@@ -40,3 +44,9 @@ jobs:
           npm audit --package-lock-only --ignore-scripts --audit-level=high
           npm audit --prefix src/deb/web-terminal --package-lock-only --ignore-scripts --audit-level=high
           npm audit --prefix professional/tests/browser --package-lock-only --ignore-scripts --audit-level=high
+      - name: Validate build and documentation tools after dependency updates
+        run: |
+          npm ci --ignore-scripts
+          npm run build
+          npm run docs:test
+          npm run docs:build
