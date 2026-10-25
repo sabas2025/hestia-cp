@@ -9,6 +9,7 @@ from pathlib import Path
 import socket
 import shutil
 import stat
+import tarfile
 import subprocess
 import sys
 import tempfile
@@ -25,7 +26,7 @@ d=importlib.util.module_from_spec(spec);sys.modules[spec.name]=d;spec.loader.exe
 class VPSDeployTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.base=Path(self.temp.name)
-        for name,value in [('STATE',self.base/'state'),('CONFIG',self.base/'config'),('ROOT',self.base/'installed'),('KEY',self.base/'ssh/public.pub'),('AUTHORIZED',self.base/'ssh/authorized_keys'),('APT_KEYRING',self.base/'keyrings/hestia-keyring.gpg'),('NATIVE_BACKUPS',self.base/'native-backups'),('NATIVE_LOCK',self.base/'native-lock/install.lock')]:
+        for name,value in [('STATE',self.base/'state'),('CONFIG',self.base/'config'),('ROOT',self.base/'installed'),('KEY',self.base/'ssh/public.pub'),('AUTHORIZED',self.base/'ssh/authorized_keys'),('APT_KEYRING',self.base/'keyrings/hestia-keyring.gpg'),('NATIVE_BACKUPS',self.base/'native-backups'),('NATIVE_LOCK',self.base/'native-lock/install.lock'),('HOSTS',self.base/'hosts')]:
             patcher=patch.object(d,name,value);patcher.start();self.addCleanup(patcher.stop)
         d.private_dir(d.CONFIG);d.private_dir(d.STATE)
         d.write_json(d.CONFIG/'config.json',{'hostname':'panel.example.com','email':'admin@example.com','username':'admin','source':d.SOURCE})
@@ -177,7 +178,13 @@ class VPSDeployTests(unittest.TestCase):
         job=self.queue();job.update(state='failed',phase='installing');d.write_json(d.STATE/'job.json',job)
         (d.CONFIG/'admin-password').unlink()
         (d.STATE/'working').mkdir();(d.STATE/'working/evidence').write_text('preserve')
-        d.atomic(d.STATE/'configuration-before.tar.gz',b'synthetic private backup')
+        self.hosts_original=b'127.0.0.1 localhost\n::1 localhost ip6-localhost\n'
+        d.HOSTS.write_bytes(self.hosts_original);d.HOSTS.chmod(0o644)
+        output=io.BytesIO()
+        with tarfile.open(fileobj=output,mode='w:gz') as archive:
+            member=tarfile.TarInfo('etc/hosts');member.size=len(self.hosts_original);member.mode=0o644
+            archive.addfile(member,io.BytesIO(self.hosts_original))
+        d.atomic(d.STATE/'configuration-before.tar.gz',output.getvalue())
         native_name='hst_install-20261025T083303Z-18039.log'
         d.atomic(d.STATE/'installation.log',('ERROR: Refresh package indexes failed (status 100); see /root/hst_install_backups/'+native_name+'\n').encode())
         events=['START Refresh package indexes','END Refresh package indexes status=0',
@@ -218,6 +225,56 @@ class VPSDeployTests(unittest.TestCase):
         self.assertTrue(d.valid_password(d.read_file(d.CONFIG/'admin-password').decode()))
         self.assertNotIn('--apply',str(self.recovery_calls));self.assertNotIn('SyntheticPassword',str(value)+str(self.recovery_calls))
         self.assertEqual([a for a in self.recovery_calls if a[0]=='/usr/bin/apt-get'],[['/usr/bin/apt-get','-o','APT::Update::Error-Mode=any','update']])
+    def test_recovery_restores_only_exact_native_hosts_addition_before_real_plan(self):
+        self.failed_repository_fixture()
+        appended=self.hosts_original+b'127.0.0.1 panel.example.com\n';d.HOSTS.write_bytes(appended)
+        def resolver(host,port,family,kind):
+            if family==socket.AF_INET6:raise socket.gaierror()
+            address='127.0.0.1' if b'127.0.0.1 panel.example.com' in d.HOSTS.read_bytes() else d.TARGET_IP
+            return [(0,0,0,'',(address,port))]
+        def runner(args):
+            if args[0]=='/usr/bin/getent':raise RuntimeError('account absent')
+            return 'Inspection result: PASS'
+        def planner():return d.plan(resolver,runner,lambda:self.source,netplan=self.base/'netplan')
+        d.atomic(d.CONFIG/'admin-password',b'SyntheticPassword123!')
+        self.assertEqual(planner()['state'],'blocked');(d.CONFIG/'admin-password').unlink()
+        result=self.recover_fixture(planner=planner)
+        self.assertEqual(result['state'],'recovered');self.assertTrue(result['hosts_restored_from_verified_backup'])
+        self.assertEqual(d.HOSTS.read_bytes(),self.hosts_original);self.assertEqual(d.HOSTS.stat().st_mode&0o777,0o644)
+        self.assertEqual(d.read_file(Path(result['history'])/'hosts-before-recovery'),appended)
+        self.assertEqual(planner()['state'],'ready')
+    def test_unrelated_hosts_changes_are_preserved_and_block_recovery(self):
+        self.failed_repository_fixture()
+        changed=self.hosts_original+b'192.0.2.9 custom.example.com\n';d.HOSTS.write_bytes(changed)
+        before=d.APT_KEYRING.read_bytes()
+        with self.assertRaises(d.RecoveryBlocked) as error:self.recover_fixture()
+        self.assertIn('/etc/hosts',str(error.exception.reasons));self.assertEqual(d.HOSTS.read_bytes(),changed)
+        self.assertEqual(d.APT_KEYRING.read_bytes(),before);self.assertFalse((d.STATE/'history').exists())
+    def test_hosts_change_is_reversed_when_later_plan_blocks_and_reason_is_retained(self):
+        self.failed_repository_fixture()
+        appended=self.hosts_original+b'127.0.0.1 panel.example.com\n';d.HOSTS.write_bytes(appended)
+        reason='Review/remove AAAA until VPS IPv6 is validated'
+        with self.assertRaises(d.RecoveryBlocked) as error:
+            self.recover_fixture(planner=lambda:{'state':'blocked','reasons':[reason,'SyntheticPassword123!']})
+        self.assertEqual(error.exception.reasons,[reason]);self.assertEqual(d.HOSTS.read_bytes(),appended)
+        record=d.read_json(next((d.STATE/'history').glob('*/recovery.json')))
+        self.assertEqual(record['reasons'],[reason]);self.assertEqual(record['phase'],'fresh-installation-plan')
+        self.assertNotIn('SyntheticPassword',json.dumps(record));self.assertFalse((d.CONFIG/'admin-password').exists())
+        self.assertEqual(d.status()['state'],'failed')
+    def test_hosts_backup_rejects_links_duplicates_and_oversized_members(self):
+        self.failed_repository_fixture()
+        for kind in ('symlink','duplicate','oversized'):
+            with self.subTest(kind=kind):
+                output=io.BytesIO()
+                with tarfile.open(fileobj=output,mode='w:gz') as archive:
+                    member=tarfile.TarInfo('etc/hosts')
+                    if kind=='symlink':member.type=tarfile.SYMTYPE;member.linkname='/etc/shadow';archive.addfile(member)
+                    elif kind=='duplicate':archive.addfile(member);archive.addfile(member)
+                    else:
+                        member.size=1048577;archive.addfile(member,io.BytesIO(b'x'*1048577))
+                d.atomic(d.STATE/'configuration-before.tar.gz',output.getvalue())
+                with self.assertRaises(d.RecoveryBlocked):self.recover_fixture()
+                self.assertEqual(d.HOSTS.read_bytes(),self.hosts_original)
     def test_recovery_rejects_later_stage_without_mutations(self):
         self.failed_repository_fixture();path=next(d.NATIVE_BACKUPS.glob('*.log'))
         path.write_text(path.read_text()+'2026-10-25T08:34:00Z START Upgrade installed packages\n')

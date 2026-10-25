@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-10-25T09:05:04.171601+00:00",
+  "status": "regression-reproduced-source-validated-vps-recovery-pending",
+  "observed_vps_phase": "failed/fresh-installation-plan",
+  "reproduced_cause": "Native installer appends loopback hostname to hosts before repository failure; subsequent system resolution fails the required public IP check",
+  "vps_cause_confirmed": false,
+  "repair_condition": "Current hosts must equal preinstall hosts plus exactly the known installer loopback line; no other edits are permitted",
+  "guards": [
+    "Original failed first-install evidence and stopped worker",
+    "Both deployment locks",
+    "Native fresh-OS preflight",
+    "Existing keyring allowlist and pinned official APT key",
+    "Unique regular bounded hosts backup member",
+    "Unchanged DNS and account checks",
+    "Restore hosts, keyring and current evidence on ordinary recovery error"
+  ],
+  "blocked_plan_reporting": "Exact known reason categories only; saved privately and returned without credentials",
+  "helper_sha256": "0fa4abc80fe4b90136a301209a56e15a253c89b607aa26f63fd1846521ffeb90",
+  "python": {
+    "tests": 166,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "groups_passed": 33,
+  "installer_executed_in_qa": false,
+  "vps_modified_by_validation": false
+}

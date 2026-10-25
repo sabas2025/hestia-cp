@@ -46,8 +46,14 @@ AUTHORIZED = Path('/root/.ssh/authorized_keys')
 APT_KEYRING = Path('/usr/share/keyrings/hestia-keyring.gpg')
 NATIVE_BACKUPS = Path('/root/hst_install_backups')
 NATIVE_LOCK = Path('/run/hestia-professional/install.lock')
+HOSTS = Path('/etc/hosts')
 ENV = {'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
        'HOME':'/root','LC_ALL':'C','LANG':'C','TERM':'dumb','DEBIAN_FRONTEND':'noninteractive'}
+
+class RecoveryBlocked(ValueError):
+    def __init__(self, reasons):
+        super().__init__('Recovery blocked; inspect the reported reasons')
+        self.reasons = reasons
 
 def controlled(path):
     path = Path(path)
@@ -316,16 +322,34 @@ def native_install_lock():
         fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);yield
     finally: os.close(fd)
 
-def replace_keyring(data):
-    # Do not use atomic(): /usr/share/keyrings must retain its public directory mode.
-    controlled(APT_KEYRING)
-    fd,name = tempfile.mkstemp(prefix='.hestia-recovery-',dir=APT_KEYRING.parent)
+def replace_public_file(destination, data, mode=0o644):
+    # Do not use atomic(): /etc and keyrings must retain their directory modes.
+    controlled(destination)
+    group = destination.stat().st_gid
+    fd,name = tempfile.mkstemp(prefix='.hestia-recovery-',dir=destination.parent)
     try:
         with os.fdopen(fd,'wb') as stream:
-            stream.write(data);stream.flush();os.fsync(stream.fileno());os.fchmod(stream.fileno(),0o644)
-        os.replace(name,APT_KEYRING)
+            stream.write(data);stream.flush();os.fsync(stream.fileno());os.fchown(stream.fileno(),0,group);os.fchmod(stream.fileno(),mode)
+        os.replace(name,destination)
     finally:
         if os.path.exists(name): os.unlink(name)
+
+def replace_keyring(data): replace_public_file(APT_KEYRING,data)
+
+def hosts_recovery_data(cfg):
+    current = read_file(HOSTS,secret=False)
+    data = read_file(STATE/'configuration-before.tar.gz',limit=67108864)
+    with tarfile.open(fileobj=io.BytesIO(data),mode='r:gz') as archive:
+        matches = [member for member in archive.getmembers() if member.name=='etc/hosts']
+        if len(matches)!=1 or not matches[0].isfile() or matches[0].size>1048576:
+            raise RecoveryBlocked(['O backup de /etc/hosts não é um arquivo regular único; revisão manual necessária.'])
+        with archive.extractfile(matches[0]) as stream: before = stream.read(1048577)
+    if current==before: return current,None
+    # The verified Ubuntu installer appends exactly this line before adding APT repos.
+    addition = ('127.0.0.1 '+cfg['hostname']+'\n').encode()
+    if current!=before+addition:
+        raise RecoveryBlocked(['/etc/hosts contém alterações além da linha conhecida do instalador; preserve o arquivo para revisão.'])
+    return current,before
 
 def apt_failure_evidence(job, cfg):
     if job.get('state')!='failed' or job.get('phase')!='installing' or any(job.get(k)!=cfg[k] for k in ('source','hostname','username')):
@@ -364,14 +388,20 @@ def recover_apt_key(reader=getpass.getpass, runner=checked, planner=plan, source
             raise ValueError('Unrecognized keyring; preserve it for manual review')
         for name in ('job.json','installation.log','configuration-before.tar.gz','working'):
             if not controlled(STATE/name).exists(): raise ValueError('Missing recovery evidence')
+        hosts_original,hosts_replacement = hosts_recovery_data(cfg)
+        hosts_mode = HOSTS.stat().st_mode & 0o777
         history = private_dir(STATE/'history')/('apt-key-'+job['id']+'-'+secrets.token_hex(8))
         private_dir(history);atomic(history/'native-installation.log',native_log)
         atomic(history/'keyring-before.gpg',old)
+        atomic(history/'hosts-before-recovery',hosts_original)
         record = {'state':'preparing','phase':'verify-official-key','previous_job':job['id'],'source':SOURCE,'native_log':str(native_path),
-                  'fingerprint':APT_KEY_FINGERPRINT,'installer_executed':False,'created':time.time()}
+                  'fingerprint':APT_KEY_FINGERPRINT,'hosts_restore_required':hosts_replacement is not None,
+                  'installer_executed':False,'created':time.time()}
         write_json(history/'recovery.json',record)
-        moved = [];password_created = False;key_changed = False
+        moved = [];password_created = False;key_changed = False;hosts_changed = False
         try:
+            if hosts_replacement is not None:
+                replace_public_file(HOSTS,hosts_replacement,hosts_mode);hosts_changed = True
             with tempfile.TemporaryDirectory(prefix='trust-',dir=history) as tmp:
                 stage = Path(tmp);key = stage/'pubkey';keyring = stage/'keyring.gpg';home = private_dir(stage/'gnupg')
                 runner(['/usr/bin/curl','--fail','--silent','--show-error','--proto','=https','--connect-timeout','10','--max-time','60','--output',str(key),APT_KEY_URL],timeout=70)
@@ -394,7 +424,15 @@ def recover_apt_key(reader=getpass.getpass, runner=checked, planner=plan, source
             atomic(CONFIG/'admin-password',password.encode());password_created = True;del password,confirm
             record.update(phase='fresh-installation-plan');write_json(history/'recovery.json',record)
             result = planner()
-            if result['state']!='ready': raise ValueError('Fresh installation plan is blocked')
+            if result['state']!='ready':
+                # plan() only returns these fixed reason categories; no raw errors or credentials.
+                allowed = ('DNS A must point directly to '+TARGET_IP,'Hostname DNS A is not published',
+                            'Review/remove AAAA until VPS IPv6 is validated','Administrator user already exists: '+cfg['username'],
+                            'Administrator group already exists: '+cfg['username'],'Native fresh-OS preflight blocked; inspect on VPS',
+                            'Empty Netplan requires networking review')
+                record['reasons'] = [reason for reason in result.get('reasons',[]) if isinstance(reason,str) and reason in allowed][:10]
+                write_json(history/'recovery.json',record)
+                raise RecoveryBlocked(record['reasons'] or ['A verificação de instalação bloqueou a recuperação; consulte o registro privado.'])
             record.update(phase='archive-failed-attempt');write_json(history/'recovery.json',record)
             # Move the ticket last. A partial archive is rolled back on ordinary errors.
             for name in ('working','installation.log','configuration-before.tar.gz','job.json'):
@@ -404,8 +442,10 @@ def recover_apt_key(reader=getpass.getpass, runner=checked, planner=plan, source
             for name in reversed(moved): (history/name).rename(STATE/name)
             if password_created: controlled(CONFIG/'admin-password').unlink()
             if key_changed: replace_keyring(old)
+            if hosts_changed: replace_public_file(HOSTS,hosts_original,hosts_mode)
             record.update(state='failed',updated=time.time());write_json(history/'recovery.json',record);raise
     return {'state':'recovered','username':cfg['username'],'history':str(history),'apt_signature_check':'passed',
+            'hosts_restored_from_verified_backup':hosts_changed,
             'installer_executed':False,'password_sent_to_github':False,'next':'plan, then start'}
 
 def backup_configuration(archive_path):
@@ -484,5 +524,7 @@ def main():
 
 if __name__=='__main__':
     try:sys.exit(main())
+    except RecoveryBlocked as error:
+        print(json.dumps({'state':'blocked','reasons':error.reasons,'installer_executed':False},ensure_ascii=False));sys.exit(1)
     except Exception:
         print(json.dumps({'state':'refused','message':'Confira DNS, configuração local, estado e log privado na VPS. Não há reinstalação automática.'}));sys.exit(1)
