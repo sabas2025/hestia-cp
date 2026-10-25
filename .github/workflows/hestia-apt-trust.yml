@@ -1,0 +1,30 @@
+name: Inspect official Hestia APT trust
+on:
+  push:
+    paths:
+      - '.github/workflows/hestia-apt-trust.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Download and inspect the official repository key
+        shell: bash
+        run: |
+          set -euo pipefail
+          workdir=$(mktemp -d)
+          trap 'rm -rf "$workdir"' EXIT
+          export GNUPGHOME="$workdir/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          curl --fail --silent --show-error --proto '=https' --max-time 30 https://apt.hestiacp.com/pubkey.gpg -o "$workdir/pubkey"
+          curl --fail --silent --show-error --proto '=https' --max-time 30 https://apt.hestiacp.com/dists/resolute/InRelease -o "$workdir/InRelease"
+          sha256sum "$workdir/pubkey" "$workdir/InRelease"
+          gpg --batch --show-keys --with-colons --fingerprint "$workdir/pubkey"
+          gpg --batch --yes --dearmor --output "$workdir/keyring.gpg" "$workdir/pubkey"
+          gpgv --status-fd=1 --keyring "$workdir/keyring.gpg" "$workdir/InRelease"
+          echo PUBLIC_KEY_BASE64_START
+          base64 -w 0 "$workdir/pubkey"
+          echo
+          echo PUBLIC_KEY_BASE64_END
