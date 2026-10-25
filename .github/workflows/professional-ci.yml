@@ -55,6 +55,8 @@ jobs:
             TWOFA_LIBRARY_ROOT="$GITHUB_WORKSPACE/.qa/twofactor/lib" \
             PLAYWRIGHT_MODULE="$GITHUB_WORKSPACE/professional/tests/browser/node_modules/playwright" \
             CHROME_BIN="$browser_path" /usr/bin/python3 professional/tests/run_checks.py --output /tmp/hestia-verification.json
+      - name: Verify the exact pinned update archive without accessing the VPS
+        run: sudo /usr/bin/python3 professional/tests/validate_update_archive.py
       - name: Check advisories for locked dependencies
         run: |
           composer --working-dir=web/inc audit --locked --no-dev

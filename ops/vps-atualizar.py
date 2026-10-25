@@ -20,11 +20,13 @@ import time
 import urllib.request
 import zipfile
 
-SOURCE = 'RELEASE_SOURCE_COMMIT'
-SUMS_SHA256 = 'RELEASE_MANIFEST_SHA256'
-EXPECTED_FILES = 0
+SOURCE = 'fb8cb26905b0ce3da4cf9c8713a6eb55772dbfc2'
+SUMS_SHA256 = 'b8af0f75529e1bba0dc3fa07a15b7c88bea603f118f99cecdf2f240479021c3d'
+EXPECTED_FILES = 1737
 STATE = Path('/var/lib/hestia-professional-upgrade')
 HELPER = Path('/usr/local/sbin/hestia-professional-update')
+POLICY = Path('/usr/sbin/policy-rc.d')
+TEMPORARY_POLICY = b'#!/bin/sh\n# HESTIA_PROFESSIONAL_DEPENDENCIES_V1\nexit 101\n'
 ENV = {'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'HOME':'/root','LC_ALL':'C','LANG':'C'}
 
 def controlled(path):
@@ -84,7 +86,9 @@ def checked(args, timeout=60, log=None):
         result = subprocess.run(args,stdin=subprocess.DEVNULL,capture_output=True,env=ENV,timeout=timeout)
         if len(result.stdout)>1048576: raise ValueError('Oversized command output')
         text = result.stdout.decode(errors='replace')
-    if result.returncode: raise RuntimeError('Command failed; inspect private VPS log')
+    if result.returncode:
+        if log is None:atomic(STATE/'command-error.log',(result.stdout+result.stderr)[-1048576:])
+        raise RuntimeError('Command failed; inspect private VPS log')
     return text
 
 def verify_bundle(folder, sums_hash=SUMS_SHA256, expected=EXPECTED_FILES):
@@ -160,7 +164,7 @@ def status():
     if not (STATE/'job.json').exists():return {'state':'not-started','source':SOURCE}
     job=read_json(STATE/'job.json')
     result={key:job[key] for key in ('state','phase','unit','source','started','updated','overlay_updated','results') if key in job}
-    if result.get('state') in ('queued','running') and time.time()-job.get('started',0)>4200:
+    if result.get('state') in ('queued','running') and time.time()-job.get('started',0)>5400:
         result['state']='interrupted-review'
     return result
 
@@ -172,6 +176,8 @@ def start(selected,recovery,runner=checked,loader=bundle):
     with locked():
         if (STATE/'job.json').exists():
             old=read_json(STATE/'job.json')
+            if old.get('state') in ('queued','running') and time.time()-old.get('started',0)<5400:
+                raise ValueError('Previous update task has not finished')
             try:runner(['/usr/bin/systemctl','is-active',old['unit']])
             except RuntimeError:pass
             else:raise ValueError('Previous update task is still active')
@@ -183,7 +189,8 @@ def start(selected,recovery,runner=checked,loader=bundle):
         try:
             runner(['/usr/bin/systemd-run','--quiet','--collect','--no-block','--unit='+unit,
                     '--property=Type=exec','--property=User=root','--property=Group=root','--property=UMask=0077',
-                    '--property=RuntimeMaxSec=4200','--property=KillMode=control-group',
+                    '--property=RuntimeMaxSec=5400','--property=KillMode=control-group',
+                    '--property=ExecStopPost=/usr/bin/python3 -I '+str(HELPER)+' _cleanup --nonce '+nonce,
                     '--property=StandardOutput=null','--property=StandardError=null','--',
                     '/usr/bin/python3','-I',str(HELPER),'_worker','--nonce',nonce])
         except Exception:job['state']='launch-failed';write_json(STATE/'job.json',job);raise
@@ -204,7 +211,7 @@ def worker(nonce,runner=checked,loader=bundle):
         if job['components']:
             args=['/usr/bin/python3','-I',str(source/'professional/dependencies.py'),'--components',','.join(job['components'])]
             if job['admin_cidr']:args+=['--admin-cidr',job['admin_cidr']]
-            result=json.loads(runner(args,timeout=3000))
+            result=json.loads(runner(args,timeout=4500))
             if result.get('state')!='succeeded':raise ValueError('Prerequisites did not finish')
             job['results']['prerequisites']=result
         runner(['/usr/bin/python3', '/usr/local/hestia/professional/health.py','--write','--installation-check'])
@@ -214,9 +221,21 @@ def worker(nonce,runner=checked,loader=bundle):
     finally:write_json(STATE/'job.json',job)
     return status()
 
+def cleanup(nonce):
+    """systemd calls this after stopping the task, including a killed package installer."""
+    with locked():
+        job=read_json(STATE/'job.json')
+        if not isinstance(nonce,str) or job.get('nonce')!=nonce:raise ValueError('Foreign cleanup task')
+        if POLICY.exists() and read_file(POLICY,secret=False,limit=4096)==TEMPORARY_POLICY:
+            POLICY.unlink()
+        if job.get('state') in ('queued','running'):
+            job.update(state='interrupted-review',updated=time.time())
+            write_json(STATE/'job.json',job)
+    return status()
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=('plan','apply','status','_worker'))
+    parser.add_argument('action',choices=('plan','apply','status','_worker','_cleanup'))
     parser.add_argument('--components',default='backup,waf,docker,node')
     parser.add_argument('--admin-cidr');parser.add_argument('--nonce');args=parser.parse_args()
     if os.geteuid()!=0:raise ValueError('Root console required')
@@ -226,7 +245,8 @@ def main():
         names=components(args.components);result['components']=names
         if 'waf' in names:result['admin_cidr']=cidr(args.admin_cidr)
     elif args.action=='apply':result=start(args.components,args.admin_cidr)
-    else:result=worker(args.nonce)
+    elif args.action=='_worker':result=worker(args.nonce)
+    else:result=cleanup(args.nonce)
     print(json.dumps(result,ensure_ascii=False))
 
 if __name__=='__main__':

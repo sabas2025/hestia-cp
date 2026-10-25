@@ -56,3 +56,17 @@ class UpdateBootstrapTests(unittest.TestCase):
         u.verify_bundle(self.source,expected,2)
         (self.source/'file.txt').write_text('unapproved source')
         with self.assertRaises(ValueError):u.verify_bundle(self.source,expected,2)
+    def test_systemd_cleanup_removes_only_own_temporary_policy_and_marks_interruption(self):
+        u.start('',None,self.runner,lambda:self.source);job=u.read_json(u.STATE/'job.json')
+        policy=self.base/'policy-rc.d';policy.write_bytes(u.TEMPORARY_POLICY);policy.chmod(0o755)
+        with patch.object(u,'POLICY',policy):
+            with self.assertRaises(ValueError):u.cleanup('foreign nonce')
+            self.assertTrue(policy.exists());result=u.cleanup(job['nonce'])
+        self.assertFalse(policy.exists());self.assertEqual(result['state'],'interrupted-review')
+        command=self.calls[-1];self.assertTrue(any(value.startswith('--property=ExecStopPost=') for value in command))
+    def test_cleanup_preserves_custom_policy_and_duplicate_requests_are_refused(self):
+        u.start('',None,self.runner,lambda:self.source);job=u.read_json(u.STATE/'job.json')
+        with self.assertRaises(ValueError):u.start('',None,self.runner,lambda:self.source)
+        policy=self.base/'policy-rc.d';policy.write_text('custom administrator policy');policy.chmod(0o755)
+        with patch.object(u,'POLICY',policy):u.cleanup(job['nonce'])
+        self.assertEqual(policy.read_text(),'custom administrator policy')

@@ -28,6 +28,11 @@ O helper `ops/vps-atualizar.py` da publicação final contém o commit e o SHA-2
 manifesto da fonte aprovada. Baixe uma revisão imutável, confira o SHA-256 publicado
 para o helper e instale-o como `/usr/local/sbin/hestia-professional-update`, root:root 0755.
 
+Fonte fixada nesta entrega: `fb8cb26905b0ce3da4cf9c8713a6eb55772dbfc2`, 1.737 arquivos;
+SHA-256 de `SHA256SUMS`: `b8af0f75529e1bba0dc3fa07a15b7c88bea603f118f99cecdf2f240479021c3d`.
+A revisão posterior fixa o bootstrap nessa fonte e acrescenta testes de encerramento
+da tarefa. A CI também baixa e verifica o ZIP imutável sem acessar a VPS.
+
 ```bash
 /usr/local/sbin/hestia-professional-update plan
 /usr/local/sbin/hestia-professional-update apply
