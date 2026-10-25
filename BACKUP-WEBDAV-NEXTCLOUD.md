@@ -23,6 +23,54 @@ da configuração em uso. Se já houver outros destinos, acrescente o objeto
 módulo é de oito destinos. Não cadastre duas entradas apontando para o mesmo
 repositório remoto.
 
+## Assistente pelo console
+
+O arquivo [ops/vps-nextcloud.py](ops/vps-nextcloud.py) cadastra um destino novo,
+sem reinstalar o Hestia. Execute-o como root em um terminal interativo depois
+de conferir o SHA-256 publicado para a revisão baixada:
+
+```bash
+python3 -I -B /root/hestia-nextcloud.py configure
+```
+
+Para um servidor WebDAV genérico, acrescente `--webdav`. O assistente pede
+identificador, URL WebDAV HTTPS, usuário, senha de aplicativo e pasta dedicada
+no próprio terminal. A senha de aplicativo fica oculta e é enviada ao
+`rclone obscure -` pela entrada padrão, sem constar nos argumentos do processo.
+Informe uma senha Restic com pelo menos 14 caracteres ou pressione Enter para
+gerar uma senha aleatória, salva em arquivo privado sem exibi-la.
+
+O assistente:
+
+- Confere os hashes e modos dos módulos instalados de backup e operações contra
+  o manifesto privado da camada antes de importá-los.
+- Recusa timers/serviços de backup ativos, tarefas pendentes, arquivos com links,
+  permissões inseguras, IDs existentes e caminhos de credenciais já usados.
+- Valida a configuração existente e a candidata, preservando outros destinos
+  e os valores de retenção.
+- Testa leitura/listagem no WebDAV, com validação TLS e tempo limitado, sem
+  mostrar nomes de arquivos nem saída privada do provedor.
+- Salva root:root/0600, mantendo cópia privada da configuração anterior e recibo
+  em `/var/lib/hestia-professional-nextcloud/`.
+- Reverte os novos arquivos de credenciais em falhas capturadas antes de salvar
+  a configuração. Se houver interrupção abrupta, preserve os arquivos e revise
+  o recibo antes de tentar de novo; não gere outra senha sobre a existente.
+
+O retorno `configured` significa cadastro local e teste de leitura concluídos.
+**Não inicializa repositório, não envia backup, não testa gravação/recuperação e
+não habilita timers.** `configured-review` significa que o cadastro foi salvo,
+mas houve falha ao registrar o recibo final; não repita o cadastro nem apague
+suas credenciais.
+
+Se aparecer `backup-timer-or-service-active`, examine os timers e serviços
+indicados antes de continuar. O assistente não interrompe backups nem desliga
+agendamentos por conta própria. Motivos não públicos são apresentados apenas
+como `private-review-required`, sem revelar senhas ou linhas de configuração.
+
+Guarde uma cópia segura da senha Restic fora da VPS. Depois execute as etapas
+de inicialização, envio, checagem e recuperação abaixo. Só habilite agendamento
+após esses testes.
+
 ## Preparar o Nextcloud
 
 1. No Nextcloud, copie a URL WebDAV mostrada nas configurações de Arquivos.
