@@ -1,13 +1,17 @@
+# Backup de sites e bancos em nuvem
+
+**WebDAV/Nextcloud:** veja o [procedimento específico](BACKUP-WEBDAV-NEXTCLOUD.md) e os modelos sem credenciais. O transporte já é aceito pela camada 1.3; conectar um destino exige cadastro privado e testes reais.
+
 > **Operação atual 1.1.1:** leia [CORRECOES-1.1.1.md](CORRECOES-1.1.1.md) antes de usar os procedimentos abaixo. A2F, estados WAF, drill histórico e disponibilidade do File Manager foram alterados. O texto 1.0/1.1 abaixo permanece como referência histórica onde houver diferença.
 
-# Backup de sites e bancos em nuvem — versão 1.1
+## Referência histórica — versão 1.1
 
 O novo `professional/cloud_backup.py` cria um backup nativo de uma conta Hestia e envia uma cópia criptografada pelo Restic para cada destino configurado. O Rclone fornece os transportes. A operação começa em modo de planejamento e exige `--apply` para executar.
 
 ## Destinos
 
 | Provider | Backend Rclone | Configuração exigida |
-|---|---|---|
+| --- | --- | --- |
 | `google-drive` | `drive` | OAuth próprio, pasta dedicada e configuração privada |
 | `amazon-s3` | `s3`, provider `AWS` | Bucket e IAM limitados ao prefixo de backup |
 | `private-s3` | `s3` | MinIO ou outro S3 compatível, com endpoint HTTPS |
@@ -87,10 +91,10 @@ Antes de produção, execute uma importação SQL e restauração de aplicação
 
 ## Fontes
 
-- https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html
-- https://restic.readthedocs.io/en/stable/040_backup.html
-- https://restic.readthedocs.io/en/stable/045_working_with_repos.html
-- https://rclone.org/drive/
-- https://rclone.org/s3/
-- https://rclone.org/ftp/
-- https://rclone.org/sftp/
+- <https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html>
+- <https://restic.readthedocs.io/en/stable/040_backup.html>
+- <https://restic.readthedocs.io/en/stable/045_working_with_repos.html>
+- <https://rclone.org/drive/>
+- <https://rclone.org/s3/>
+- <https://rclone.org/ftp/>
+- <https://rclone.org/sftp/>

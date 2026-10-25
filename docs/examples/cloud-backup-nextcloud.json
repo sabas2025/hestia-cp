@@ -1,0 +1,19 @@
+{
+  "schema": 2,
+  "rpo_hours": 24,
+  "rto_minutes": 120,
+  "keep_daily": 7,
+  "keep_weekly": 4,
+  "keep_monthly": 6,
+  "targets": [
+    {
+      "id": "nextcloud",
+      "provider": "private-webdav",
+      "remote": "nextcloud",
+      "path": "hestia/servidor/restic",
+      "password_file": "/etc/hestiacp/professional/secrets/nextcloud.password",
+      "rclone_config": "/etc/hestiacp/professional/secrets/nextcloud.conf"
+    }
+  ],
+  "append_only": false
+}
