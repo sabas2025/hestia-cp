@@ -19,7 +19,7 @@ Publique no provedor DNS autoritativo um registro A do hostname escolhido aponta
 	--hostname HOSTNAME_REAL --email EMAIL_ADMINISTRATIVO
 ```
 
-O setup solicita a senha duas vezes com entrada oculta. Use 14–128 caracteres com maiúscula, minúscula e número, sem dois-pontos nem quebra de linha. Ela fica somente em `/etc/hestia-github-deploy/admin-password`, root/0600, e não é enviada ao GitHub. O usuário do painel é `admin`. A configuração fica em `config.json`, no mesmo diretório privado.
+O setup solicita a senha duas vezes com entrada oculta. Use 14–128 caracteres com maiúscula, minúscula e número, sem dois-pontos nem quebra de linha. Ela fica somente em `/etc/hestia-github-deploy/admin-password`, root/0600, e não é enviada ao GitHub. O usuário inicial do painel é `admin`; `setup --username NOME` permite escolher outro nome válido. A configuração fica em `config.json`, no mesmo diretório privado.
 
 O setup valida a chave pública dedicada já usada no diagnóstico e altera somente a autorização dessa chave em `/root/.ssh/authorized_keys`, preservando as outras linhas e um backup privado. Ela passa a executar o helper restrito, que aceita somente `plan`, `start`, `status` e a chamada de diagnóstico anterior. Não libera shell, SFTP, túneis ou comandos arbitrários. O setup requer console root e não pode ser solicitado pela chave do workflow.
 
@@ -64,3 +64,19 @@ Os testes do bootstrap usam fixtures e simulação de comandos externos; não ex
 O [CI da revisão do bootstrap](https://github.com/sabas2025/hestia-cp/actions/runs/40174521420) foi aprovado. A suíte completa foi repetida sobre o ZIP publicado: **149 testes Python, zero falhas/erros/skips e 33 grupos aprovados**. A conferência encontrou **1.703 blobs e modos Git correspondentes e 1.702 checksums corretos**, sem divergências antes/depois dos testes. Os 22 testes novos exercitam o bootstrap e a comunicação do workflow com serviços simulados. A origem antiga fixada pelo instalador também foi baixada, extraída e verificada em seus 1.697 arquivos.
 
 [Evidência estruturada](professional/test-results/vps-bootstrap-validation.json) e [suíte local](professional/test-results/verification-vps-bootstrap.json). Esse resultado valida o código publicado; a instalação real e o aceite dos serviços na VPS continuam pendentes.
+
+## Grupo admin já existente
+
+Se o plano informar `Administrator group already exists: admin`, preserve o grupo Linux. A instalação ainda não foi executada; escolha um nome livre para o administrador do painel.
+
+O bootstrap atualizado oferece um comando de console root, indisponível pela chave SSH restrita:
+
+```bash
+/usr/local/sbin/hestia-github-implantacao set-user --username sabasadmin
+```
+
+Esse comando altera somente a configuração privada do bootstrap, com backup da configuração anterior. Valida o nome e recusa usuário/grupo já existente ou instalação já iniciada. Preserva a senha, as chaves SSH e os usuários/grupos do sistema. Não execute novamente `setup` nem apague grupos para contornar o bloqueio.
+
+Depois de atualizar o helper instalado e executar `set-user`, rode `plan` novamente no GitHub. `installer_args` passa o usuário configurado ao instalador nativo; o instalador grava esse nome como `ROOT_USER`. O login do painel passa a ser o nome escolhido, usando a senha definida anteriormente.
+
+[Evidência da correção de nome](professional/test-results/vps-username-fix.json) e [suíte atualizada](professional/test-results/verification-vps-username-fix.json). As evidências anteriores de 149 testes correspondem à revisão inicial do bootstrap, sem esta atualização.

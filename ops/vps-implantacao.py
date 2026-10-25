@@ -105,11 +105,16 @@ def valid_hostname(value):
 def valid_password(value):
     return isinstance(value,str) and 14<=len(value)<=128 and not any(v in value for v in ('\n','\r','\0',':')) and not value.startswith('/tmp/') and all(re.search(r,value) for r in ('[A-Z]','[a-z]','[0-9]'))
 
+def valid_username(value):
+    reserved = {'root','sudo','mysql','hestiaweb','hestiamail','aria','aria_log','mysql_upgrade',
+                'ib','ib_buffer','ddl','ddl_recovery','performance'}
+    return isinstance(value,str) and bool(re.fullmatch(r'[a-z][a-z0-9_]{1,29}',value)) and value not in reserved
+
 def settings():
     cfg = read_json(CONFIG/'config.json')
     if not isinstance(cfg,dict) or set(cfg)!={'hostname','email','username','source'} or cfg['source']!=SOURCE:
         raise ValueError('Invalid deployment configuration')
-    if not valid_hostname(cfg['hostname']) or not isinstance(cfg['email'],str) or not re.fullmatch(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}',cfg['email']) or cfg['username']!='admin':
+    if not valid_hostname(cfg['hostname']) or not isinstance(cfg['email'],str) or not re.fullmatch(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}',cfg['email']) or not valid_username(cfg['username']):
         raise ValueError('Invalid account settings')
     return cfg
 
@@ -126,9 +131,9 @@ def replace_authorization(old, public):
     output.append('restrict,command="'+str(HELPER)+'" '+' '.join(key)+' github-hestia-diagnostico\n')
     return ''.join(output)
 
-def setup(hostname, email, reader=getpass.getpass):
-    cfg = {'hostname':hostname,'email':email,'username':'admin','source':SOURCE}
-    if not valid_hostname(hostname) or not re.fullmatch(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}',email):
+def setup(hostname, email, reader=getpass.getpass, username='admin'):
+    cfg = {'hostname':hostname,'email':email,'username':username,'source':SOURCE}
+    if not valid_hostname(hostname) or not re.fullmatch(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,63}',email) or not valid_username(username):
         raise ValueError('Invalid hostname or email')
     with locked():
         if (CONFIG/'config.json').exists() or (STATE/'job.json').exists():
@@ -145,8 +150,22 @@ def setup(hostname, email, reader=getpass.getpass):
         write_json(CONFIG/'config.json',cfg)
         atomic(CONFIG/('authorized_keys.before-'+str(int(time.time()))),old.encode())
         atomic(AUTHORIZED,replacement.encode())
-    return {'state':'configured','source':SOURCE,'hostname':hostname,'password_sent_to_github':False,
+    return {'state':'configured','source':SOURCE,'hostname':hostname,'username':username,'password_sent_to_github':False,
             'ssh_commands':['diagnostic','plan','start','status']}
+
+def set_user(username, runner=checked):
+    if not valid_username(username): raise ValueError('Invalid or reserved panel username')
+    with locked():
+        if (STATE/'job.json').exists() or ROOT.exists(): raise ValueError('Account changes require an installation that has not started')
+        cfg = settings()
+        for database in ('passwd','group'):
+            try: runner(['/usr/bin/getent',database,username])
+            except RuntimeError: continue
+            raise ValueError('Selected account or group already exists')
+        atomic(CONFIG/('config.before-user-'+secrets.token_hex(8)+'.json'),read_file(CONFIG/'config.json'))
+        cfg['username'] = username;write_json(CONFIG/'config.json',cfg)
+    return {'state':'configured','username':username,'password_preserved':True,
+            'system_users_or_groups_modified':False,'installer_executed':False}
 
 def verify_bundle(folder, sums_hash=SUMS_SHA256, expected=EXPECTED_FILES):
     sums = read_file(folder/'SHA256SUMS',secret=False,limit=1048576)
@@ -213,14 +232,14 @@ def plan(resolver=socket.getaddrinfo, runner=checked, source_loader=bundle, netp
     password = read_file(CONFIG/'admin-password',limit=256).decode()
     if not valid_password(password): raise ValueError('Local password missing or invalid')
     del password
-    try: runner(['/usr/bin/getent','passwd','admin']); reasons.append('Administrator user already exists')
+    try: runner(['/usr/bin/getent','passwd',cfg['username']]); reasons.append('Administrator user already exists: '+cfg['username'])
     except RuntimeError: pass
-    try: runner(['/usr/bin/getent','group','admin']); reasons.append('Administrator group already exists')
+    try: runner(['/usr/bin/getent','group',cfg['username']]); reasons.append('Administrator group already exists: '+cfg['username'])
     except RuntimeError: pass
     try: native = runner(['/bin/bash',str(source/'install/hst-install.sh'),'--preflight'])
     except RuntimeError: native = ''; reasons.append('Native fresh-OS preflight blocked; inspect on VPS')
     if netplan.is_dir() and not any(p.is_file() for p in netplan.iterdir()): reasons.append('Empty Netplan requires networking review')
-    return {'state':'blocked' if reasons else 'ready','source':SOURCE,'hostname':cfg['hostname'],
+    return {'state':'blocked' if reasons else 'ready','source':SOURCE,'hostname':cfg['hostname'],'username':cfg['username'],
             'url':'https://'+cfg['hostname']+':8083','reasons':reasons,'preflight':native[-4096:],
             'installer_executed':False,'password_sent_to_github':False,
             'profile':'Nginx+Apache, PHP 8.4, MariaDB, DNS, email, native mail antivirus/antispam, Fail2Ban, resource limits; optional enterprise modules remain pending'}
@@ -229,7 +248,7 @@ def status():
     if not (STATE/'job.json').exists(): return {'state':'not-started','source':SOURCE}
     job = read_json(STATE/'job.json')
     # This public record is intentionally small; never return logs or configuration.
-    result = {key:job[key] for key in ('state','id','phase','started','updated','source','hostname','url','unit') if key in job}
+    result = {key:job[key] for key in ('state','id','phase','started','updated','source','hostname','username','url','unit') if key in job}
     if job['state']=='queued' and time.time()-job['started']>300: result['state']='queue-expired'
     if job['state']=='running' and time.time()-job['started']>5400: result['state']='interrupted-review'
     return result
@@ -241,7 +260,7 @@ def start(runner=checked, planner=plan):
         if result['state']!='ready': return result
         ident = secrets.token_hex(16);unit = 'hestia-install-'+ident
         job = {'state':'queued','id':ident,'phase':'waiting-for-worker','started':time.time(),'updated':time.time(),
-               'source':SOURCE,'hostname':result['hostname'],'url':result['url'],'unit':unit}
+               'source':SOURCE,'hostname':result['hostname'],'username':settings()['username'],'url':result['url'],'unit':unit}
         write_json(STATE/'job.json',job)
         try:
             runner(['/usr/bin/systemd-run','--quiet','--collect','--unit='+unit,'--property=Type=exec',
@@ -256,7 +275,7 @@ def start(runner=checked, planner=plan):
 
 def installer_args(source, cfg):
     return ['/bin/bash',str(source/'install/hst-install.sh'),'--apply','--interactive','no',
-            '--hostname',cfg['hostname'],'--email',cfg['email'],'--username','admin',
+            '--hostname',cfg['hostname'],'--email',cfg['email'],'--username',cfg['username'],
             '--password-file',str(CONFIG/'admin-password'),'--lang','pt-br','--port','8083',
             '--apache','yes','--phpfpm','yes','--multiphp','8.4','--mysql','yes',
             '--named','yes','--exim','yes','--dovecot','yes','--sieve','yes',
@@ -328,11 +347,12 @@ def main():
         if len(sys.argv)!=1: raise ValueError('Forced SSH command takes no direct arguments')
         action = ssh_action(os.environ.get('SSH_ORIGINAL_COMMAND',''));args = None
     else:
-        parser = argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('setup','plan','start','status','worker'))
-        parser.add_argument('id',nargs='?');parser.add_argument('--hostname');parser.add_argument('--email');args = parser.parse_args();action = args.action
+        parser = argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('setup','set-user','plan','start','status','worker'))
+        parser.add_argument('id',nargs='?');parser.add_argument('--hostname');parser.add_argument('--email');parser.add_argument('--username');args = parser.parse_args();action = args.action
     if action=='diagnostic':
         os.execve('/usr/local/sbin/hestia-github-diagnostico',['hestia-github-diagnostico'],ENV)
-    if action=='setup': result = setup(args.hostname,args.email)
+    if action=='setup': result = setup(args.hostname,args.email,username=args.username or 'admin')
+    elif action=='set-user': result = set_user(args.username)
     elif action=='plan': result = plan()
     elif action=='start': result = start()
     elif action=='worker': result = worker(args.id or '')

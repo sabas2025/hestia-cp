@@ -1,0 +1,23 @@
+{
+  "generated_at": "2026-10-25T08:13:31.464990+00:00",
+  "status": "local-checks-passed",
+  "python": {
+    "tests": 152,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "groups": 33,
+  "bootstrap_tests": 25,
+  "regression_run": 40175405477,
+  "observed_action": "plan",
+  "observed_block": "Administrator group already exists",
+  "observed_installer_executed": false,
+  "change": "Root-console set-user changes only the planned account; installer uses the configured username",
+  "password_preserved_in_regression_test": true,
+  "existing_system_users_and_groups_modified": false,
+  "native_installer_executed_in_tests": false,
+  "vps_username_change_applied_by_assistant": false,
+  "helper_sha256": "2b09bc39021dbf50b27ac6b16f38e4e035fcdeacfce23871ae9a1ebaececfc7d",
+  "pinned_install_source": "f974fbf852270d0f0b1d0a451b5dea0c409119b4"
+}

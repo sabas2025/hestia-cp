@@ -35,7 +35,7 @@ class VPSDeployTests(unittest.TestCase):
     def queue(self):return d.start(runner=lambda args:'',planner=self.ready)
     def test_ssh_allowlist_rejects_shell_commands_and_setup(self):
         for action in ('plan','start','status'):self.assertEqual(d.ssh_action(str(d.HELPER)+' '+action),action)
-        for cmd in ('bash','id',str(d.HELPER)+' setup',str(d.HELPER)+' start; id',str(d.HELPER)+' worker abc',''):
+        for cmd in ('bash','id',str(d.HELPER)+' setup',str(d.HELPER)+' set-user --username sabasadmin',str(d.HELPER)+' start; id',str(d.HELPER)+' worker abc',''):
             with self.subTest(cmd=cmd),self.assertRaises(ValueError):d.ssh_action(cmd)
     def test_configuration_and_password_validation(self):
         self.assertTrue(d.valid_password('SyntheticPassword123!'))
@@ -43,6 +43,37 @@ class VPSDeployTests(unittest.TestCase):
             self.assertFalse(d.valid_password(pw))
         cfg=d.settings();cfg['source']='bad';d.write_json(d.CONFIG/'config.json',cfg)
         with self.assertRaises(ValueError):d.settings()
+    def test_switch_panel_username_preserves_password_and_system_groups(self):
+        before=d.read_file(d.CONFIG/'admin-password');calls=[]
+        def missing(args):calls.append(args);raise RuntimeError('unknown account')
+        result=d.set_user('sabasadmin',runner=missing)
+        self.assertTrue(result['password_preserved']);self.assertFalse(result['system_users_or_groups_modified'])
+        self.assertEqual(d.read_file(d.CONFIG/'admin-password'),before)
+        self.assertEqual(d.settings()['username'],'sabasadmin')
+        self.assertEqual(calls,[['/usr/bin/getent','passwd','sabasadmin'],['/usr/bin/getent','group','sabasadmin']])
+        self.assertEqual(len(list(d.CONFIG.glob('config.before-user-*.json'))),1)
+        args=d.installer_args(self.source,d.settings());self.assertEqual(args[args.index('--username')+1],'sabasadmin')
+    def test_switch_username_refuses_reserved_existing_or_started_installation(self):
+        for name in ('root','mysql','../admin','admin;id','AUser'):
+            with self.subTest(name=name),self.assertRaises(ValueError):d.set_user(name)
+        with self.assertRaises(ValueError):d.set_user('existing',runner=lambda args:'found')
+        self.queue()
+        with self.assertRaises(ValueError):d.set_user('sabasadmin',runner=lambda args:'')
+        self.assertEqual(d.settings()['username'],'admin')
+    def test_existing_admin_group_does_not_block_free_custom_panel_account(self):
+        def runner(args):
+            if 'getent' in args[0]:
+                if args[1:]==['group','admin']:return 'admin:x:123:\n'
+                raise RuntimeError('unknown account')
+            return 'Inspection result: PASS'
+        def resolver(host,port,family,kind):
+            if family==socket.AF_INET6:raise socket.gaierror()
+            return [(0,0,0,'',(d.TARGET_IP,port))]
+        first=d.plan(resolver,runner,lambda:self.source,netplan=self.base/'netplan')
+        self.assertEqual(first['state'],'blocked');self.assertIn('Administrator group already exists: admin',first['reasons'])
+        d.set_user('sabasadmin',runner=runner)
+        second=d.plan(resolver,runner,lambda:self.source,netplan=self.base/'netplan')
+        self.assertEqual(second['state'],'ready');self.assertEqual(second['username'],'sabasadmin')
     def test_private_files_reject_modes_links_and_writable_parents(self):
         p=d.CONFIG/'admin-password';p.chmod(0o644)
         with self.assertRaises(ValueError):d.read_file(p)
