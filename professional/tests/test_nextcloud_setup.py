@@ -132,6 +132,17 @@ class NextcloudSetupTests(unittest.TestCase):
         self.assertEqual(self.config.read_bytes(), self.before)
         self.assertFalse((self.secret_dir / 'nextcloud.conf').exists())
 
+    def test_failed_durable_write_removes_only_the_file_it_created(self):
+        path = self.base / 'new-secret'
+        with patch.object(n.os, 'fsync', side_effect=OSError('synthetic disk failure')):
+            with self.assertRaises(OSError):
+                n.new_file(path, b'SYNTHETIC-SECRET')
+        self.assertFalse(path.exists())
+        private(path, 'PREEXISTING-SECRET')
+        with self.assertRaises(FileExistsError):
+            n.new_file(path, b'SYNTHETIC-SECRET')
+        self.assertEqual(path.read_text(), 'PREEXISTING-SECRET')
+
     def test_receipt_failure_after_commit_reports_configuration_without_deleting_credentials(self):
         original = n.new_file
         def fail(path, data):
