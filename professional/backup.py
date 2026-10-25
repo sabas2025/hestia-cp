@@ -17,9 +17,11 @@ def settings(path):
     if path.is_symlink() or stat.st_uid != 0 or stat.st_mode & 0o077:
         raise ValueError("Backup configuration must be a root-owned regular file with mode 0600")
     result = json.loads(private_read(path))
-    allowed = {"repository", "password_file", "keep_daily", "rpo_hours", "rto_minutes"}
+    allowed = {"repository", "password_file", "keep_daily", "rpo_hours", "rto_minutes", "append_only"}
     if set(result) - allowed:
         raise ValueError("Unknown backup configuration key")
+    if type(result.setdefault('append_only', False)) is not bool:
+        raise ValueError('append_only must be boolean')
     repository = result.get("repository", "")
     if not isinstance(repository, str) or not repository.startswith(("/", "sftp:", "s3:", "rclone:")) or any(c in repository for c in "\r\n"):
         raise ValueError("Use an absolute path or sftp:, s3:, rclone: repository")
@@ -52,6 +54,8 @@ def checked(args, env=None):
 
 def execute(action, user, cfg, root, runner=checked):
     user = username(user)
+    if action == 'retention' and cfg.get('append_only'):
+        raise ValueError('Retention/prune is disabled by append_only policy; use a separately authorized repository maintenance identity')
     if not (root / "data/users" / user / "user.conf").is_file():
         raise ValueError("Hestia user does not exist")
     conf = config(root / "conf/hestia.conf")

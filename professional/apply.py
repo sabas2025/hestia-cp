@@ -173,13 +173,23 @@ def apply_files(root, source, refresh=False, quarantine_filemanager=False):
         if live_path.is_file() and live_path.read_bytes() != expected.read_bytes() and hashlib.sha256(live_path.read_bytes()).hexdigest() not in allowed:
             raise ValueError('MFA contract changed; review local authentication modifications')
     fm = root / 'web/fm'
+    cache_templates = list((source / 'professional/cache-templates').glob('professional-safe.*'))
+    if {p.suffix for p in cache_templates} != {'.tpl','.stpl','.sh'}:
+        raise ValueError('Complete cache template set required')
+    # Check all custom targets before copying anything or quarantining File Manager.
+    for template in cache_templates:
+        target = root / 'data/templates/web/nginx' / template.name
+        if target.is_symlink() or any(p.is_symlink() for p in target.parents):
+            raise ValueError('Unsafe cache template target')
+        if target.exists() and (not target.is_file() or target.stat().st_size > 2097152 or target.read_bytes() != template.read_bytes()):
+            raise ValueError('Custom cache template differs; review before applying')
     if fm.exists() or fm.is_symlink():
         if not quarantine_filemanager:
             raise ValueError('Existing File Manager requires review. Use --quarantine-filemanager to preserve it outside web root and disable its UI.')
         quarantine_file_manager(root)
     files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
     files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
-    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-backup-user')]
+    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-backup-user')]
     files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php')]
     files += [source / "web/css/themes/custom/professional.css"]
     files += [source / 'professional/mfa-logrotate.conf']
@@ -194,6 +204,11 @@ def apply_files(root, source, refresh=False, quarantine_filemanager=False):
         if file.resolve() != destination.resolve():
             atomic_file(destination, file.read_bytes(), 0o755 if file.suffix == ".py" or file.parent.name == 'bin' else 0o644)
         manifest.append({"file": str(destination.relative_to(root)), "sha256": hashlib.sha256(file.read_bytes()).hexdigest(), 'mode': destination.stat().st_mode & 0o777})
+    for template in cache_templates:
+        relative = Path('data/templates/web/nginx') / template.name
+        mode = 0o755 if template.suffix == '.sh' else 0o644
+        atomic_file(root / relative, template.read_bytes(), mode)
+        manifest.append({'file': str(relative), 'sha256': hashlib.sha256(template.read_bytes()).hexdigest(), 'mode': mode})
     common = source / "install/hst-common.sh"
     asset_lock = source / "install/assets.lock.tsv"
     if common.exists():

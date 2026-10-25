@@ -27,9 +27,11 @@ def identifier(value):
 
 def settings(path):
     cfg = json.loads(private_read(path))
-    allowed = {'schema', 'targets', 'rpo_hours', 'rto_minutes', 'keep_daily', 'keep_weekly', 'keep_monthly'}
+    allowed = {'schema', 'targets', 'rpo_hours', 'rto_minutes', 'keep_daily', 'keep_weekly', 'keep_monthly', 'append_only'}
     if not isinstance(cfg, dict) or set(cfg) - allowed or cfg.get('schema') != 2:
         raise ValueError('Expected cloud backup schema 2')
+    if type(cfg.setdefault('append_only', False)) is not bool:
+        raise ValueError('append_only must be boolean')
     for key, default in [('rpo_hours', 24), ('rto_minutes', 120), ('keep_daily', 7), ('keep_weekly', 4), ('keep_monthly', 6)]:
         value = cfg.setdefault(key, default)
         if type(value) is not int or not 1 <= value <= 3650:
@@ -218,6 +220,8 @@ def make_archive(root, user, runner, staging):
     return archive, evidence
 
 def execute(action, user, cfg, root, target_id=None, runner=checked):
+    if action == 'retention' and cfg.get('append_only'):
+        raise ValueError('Retention/prune is disabled by append_only policy; enforce storage retention separately')
     username(user)
     account = root / 'data/users' / user / 'user.conf'
     if not account.is_file() or config(account).get('SUSPENDED') != 'no':

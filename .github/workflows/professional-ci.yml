@@ -17,7 +17,7 @@ jobs:
       - name: Install QA tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y php8.3-cli python3-qrcode python3-cryptography shellcheck nodejs npm zstd composer
+          sudo apt-get install -y php8.3-cli python3-qrcode python3-cryptography shellcheck nodejs npm zstd composer nginx
           npm ci --ignore-scripts --prefix professional/tests/browser
           professional/tests/browser/node_modules/.bin/playwright install --with-deps chromium
       - name: Fetch exact Composer-locked TOTP library for the isolated test
@@ -29,7 +29,7 @@ jobs:
       - name: Mandatory tests without skipped checks
         run: |
           browser_path=$(node -e 'process.stdout.write(require("./professional/tests/browser/node_modules/playwright").chromium.executablePath())')
-          sudo env PHP_BINARY=/usr/bin/php8.3 SHELLCHECK_BINARY=/usr/bin/shellcheck \
+          sudo env PHP_BINARY=/usr/bin/php8.3 SHELLCHECK_BINARY=/usr/bin/shellcheck NGINX_BINARY=/usr/sbin/nginx \
             TWOFA_LIBRARY_ROOT="$GITHUB_WORKSPACE/.qa/twofactor/lib" \
             PLAYWRIGHT_MODULE="$GITHUB_WORKSPACE/professional/tests/browser/node_modules/playwright" \
             CHROME_BIN="$browser_path" /usr/bin/python3 professional/tests/run_checks.py --output /tmp/hestia-verification.json

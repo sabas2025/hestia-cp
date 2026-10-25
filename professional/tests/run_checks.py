@@ -39,14 +39,19 @@ def main():
     else: result['checks'].append({'name':'ShellCheck','status':'unavailable'})
     node=shutil.which('node')
     if node:run('JavaScript syntax',[node,'--check',str(ROOT/'web/professional/dashboard.js')])
+    if node:run('Operations JavaScript syntax',[node,'--check',str(ROOT/'web/professional/business.js')])
     if node:run('Node project example syntax',[node,'--check',str(ROOT/'professional/node-server.example.mjs')])
     else: result['checks'].append({'name':'Node/JavaScript','status':'unavailable'})
     for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa'):run('Bash MFA syntax '+name,['bash','-n',str(ROOT/'bin'/name)])
     run('Python syntax',[sys.executable,'-m','compileall','-q',str(ROOT/'professional')])
     if php:run('Whole-tree source syntax',[sys.executable,str(ROOT/'professional/tests/static_syntax.py')])
+    if os.environ.get('NGINX_BINARY') or shutil.which('nginx'):
+        run('Nginx public cache template validation',[sys.executable,str(ROOT/'professional/tests/validate_cache.py')])
+    else:result['checks'].append({'name':'Nginx public cache template validation','status':'unavailable'})
     if node and os.environ.get('PLAYWRIGHT_MODULE') and os.environ.get('CHROME_BIN'):
         run('Generate preview from current PHP',[sys.executable,str(ROOT/'professional/tests/build_preview.py')])
         run('Browser desktop and mobile',[node,str(ROOT/'professional/tests/test_visual.cjs')])
+        run('Operations browser desktop and mobile',[node,str(ROOT/'professional/tests/test_business_visual.cjs')])
     else: result['checks'].append({'name':'Browser desktop and mobile','status':'unavailable'})
     result['mode'] = 'quick' if args.quick else 'release'
     complete = outcome.wasSuccessful() and not outcome.skipped and all(c['status']=='passed' for c in result['checks'])

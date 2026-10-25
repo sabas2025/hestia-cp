@@ -1,6 +1,6 @@
 {
-  "overlay_version": "1.1.1",
-  "reviewed_at": "2026-10-19",
+  "overlay_version": "1.2.0",
+  "reviewed_at": "2026-10-25",
   "review_before": "2026-12-01",
   "hestia_supported": [
     "1.10.5"

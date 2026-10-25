@@ -21,7 +21,7 @@
       <?php if ($payload['resources'][$key]['enabled']): ?><a href="<?= $href ?>"><?= $label ?></a><?php endif; ?>
       <?php endforeach; ?>
       <?php if ($identity['admin']): ?><span class="pro-nav-label">Servidor</span><a href="/list/user/">Usuários e acessos</a><a href="/list/server/">Serviços e atualizações</a><a href="/list/firewall/">Firewall</a><?php endif; ?>
-      <span class="pro-nav-label">Conta</span><a href="<?= pro_escape($settingsUrl) ?>">Segurança e preferências</a><a href="/list/log/">Histórico de atividades</a>
+      <a href="/professional/business.php">Operações e diagnóstico</a><span class="pro-nav-label">Conta</span><a href="<?= pro_escape($settingsUrl) ?>">Segurança e preferências</a><a href="/list/log/">Histórico de atividades</a>
     </nav>
     <div class="pro-sidebar-note"><span class="pro-status-dot"></span>Sessão protegida<small>Informações restritas à sua conta.</small></div>
   </aside>
