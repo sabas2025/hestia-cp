@@ -1,6 +1,6 @@
 {
   "generated_at": "2026-10-25T07:53:14.686741+00:00",
-  "status": "local-checks-passed",
+  "status": "passed",
   "python": {
     "tests": 149,
     "failures": 0,
@@ -25,5 +25,30 @@
     "A": "NXDOMAIN",
     "AAAA": "NXDOMAIN",
     "scope": "Observation before deployment; must be checked again on VPS"
+  },
+  "github_ci": {
+    "id": 40174521420,
+    "status": "completed",
+    "conclusion": "success",
+    "sha": "93889257027e4e29149ae4dd12760d0d07284d38",
+    "url": "https://github.com/sabas2025/hestia-cp/actions/runs/40174521420"
+  },
+  "published_download": {
+    "commit": "93889257027e4e29149ae4dd12760d0d07284d38",
+    "files": 1703,
+    "checksums": 1702,
+    "mismatches": [],
+    "zip_sha256": "21e0c350a1a38611c5dda31a8603e8e77eac6fcdd6a36ec24f7941b33a22b3fa"
+  },
+  "downloaded_suite": {
+    "status": "passed",
+    "python": {
+      "tests": 149,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "groups": 33,
+    "post_test_checksum_mismatches": []
   }
 }

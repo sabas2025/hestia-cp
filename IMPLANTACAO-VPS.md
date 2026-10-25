@@ -58,3 +58,9 @@ Todos ficam na VPS, sem upload como artifact do GitHub:
 - `/var/lib/hestia-github-deploy/working`: cópia efetivamente usada, com a supressão da mensagem inicial.
 
 Os testes do bootstrap usam fixtures e simulação de comandos externos; não executam um instalador completo nem alteram SSH do host de testes. O diagnóstico real anterior só comprovou leitura. A implantação real só pode ser declarada após o worker na VPS e a verificação de seu resultado.
+
+## Evidências do bootstrap
+
+O [CI da revisão do bootstrap](https://github.com/sabas2025/hestia-cp/actions/runs/40174521420) foi aprovado. A suíte completa foi repetida sobre o ZIP publicado: **149 testes Python, zero falhas/erros/skips e 33 grupos aprovados**. A conferência encontrou **1.703 blobs e modos Git correspondentes e 1.702 checksums corretos**, sem divergências antes/depois dos testes. Os 22 testes novos exercitam o bootstrap e a comunicação do workflow com serviços simulados. A origem antiga fixada pelo instalador também foi baixada, extraída e verificada em seus 1.697 arquivos.
+
+[Evidência estruturada](professional/test-results/vps-bootstrap-validation.json) e [suíte local](professional/test-results/verification-vps-bootstrap.json). Esse resultado valida o código publicado; a instalação real e o aceite dos serviços na VPS continuam pendentes.
