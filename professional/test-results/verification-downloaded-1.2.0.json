@@ -1,0 +1,247 @@
+{
+  "generated_at": "2026-10-25T06:18:05.360513+00:00",
+  "installer_executed": false,
+  "vps_accessed": false,
+  "checks": [
+    {
+      "name": "bash -n hst-install.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-common.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-debian.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "bash -n hst-install-ubuntu.sh",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/business-client.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/business-client.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/index.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/index.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/model.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/model.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/twofactor-view.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/twofactor-view.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/twofactor.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/twofactor.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/business-view.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/business-view.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/mfa-client.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/mfa-client.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/view.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/view.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/professional/business.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/professional/business.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/inc/2fa/check.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/inc/2fa/check.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/inc/2fa/local-provider.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/inc/2fa/local-provider.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP lint web/inc/2fa/secret.php",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "No syntax errors detected in /workspace/scratch/23a2fd9c3f6d/published-1.2/web/inc/2fa/secret.php\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP authorization and data-scoping assertions",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\n    \"checks\": 34,\n    \"status\": \"passed\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "PHP test runtime",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)\nCopyright (c) The PHP Group\nZend Engine v4.3.6, Copyright (c) Zend Technologies\n",
+      "stderr": ""
+    },
+    {
+      "name": "ShellCheck new shared code",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "ShellCheck installer error-level findings",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "JavaScript syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Operations JavaScript syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Node project example syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-add-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-check-user-2fa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Bash MFA syntax v-professional-mfa",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Python syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "name": "Whole-tree source syntax",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\"php\": 333, \"bash\": 681, \"failures\": []}\n",
+      "stderr": ""
+    },
+    {
+      "name": "Nginx public cache template validation",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\"templates\": 2, \"nginx_syntax\": \"passed\", \"nginx_started\": false, \"application_cache_hit_tested\": false}\n",
+      "stderr": ""
+    },
+    {
+      "name": "OpenSSH generated policy validation",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\"policies\": [\"keys-only\", \"sftp-only\", \"disabled\"], \"syntax_and_effective_configuration\": \"passed\", \"ssh_listener_started\": false, \"remote_login_tested\": false}\n",
+      "stderr": ""
+    },
+    {
+      "name": "Generate preview from current PHP",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "Standalone preview generated from the PHP template; illustrative data only\n",
+      "stderr": ""
+    },
+    {
+      "name": "Browser desktop and mobile",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\n  \"status\": \"passed\",\n  \"viewports\": 3,\n  \"reports\": [\n    {\n      \"viewport\": 360,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 768,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    },\n    {\n      \"viewport\": 1440,\n      \"horizontal_overflow\": false,\n      \"search\": \"passed\",\n      \"empty_state\": \"passed\",\n      \"js_errors\": 0\n    }\n  ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "Operations browser desktop and mobile",
+      "status": "passed",
+      "exit": 0,
+      "stdout": "{\"status\":\"passed\",\"results\":[{\"width\":360,\"overflow\":false,\"review\":\"passed\",\"queue\":\"mocked\",\"rollback\":\"mocked\",\"js_errors\":0},{\"width\":768,\"overflow\":false,\"review\":\"passed\",\"queue\":\"mocked\",\"rollback\":\"mocked\",\"js_errors\":0},{\"width\":1440,\"overflow\":false,\"review\":\"passed\",\"queue\":\"mocked\",\"rollback\":\"mocked\",\"js_errors\":0}],\"native_services\":\"mocked\"}\n",
+      "stderr": ""
+    }
+  ],
+  "python": {
+    "tests": 127,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "php_runtime": "PHP 8.3.6 (cli) (built: Jul 16 2026 18:30:41) (NTS)",
+  "mode": "release",
+  "status": "passed"
+}

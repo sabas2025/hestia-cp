@@ -20,9 +20,9 @@ Exemplo, após revisar a origem e substituir seu caminho:
 
 ```bash
 python3 /caminho/revisado/hestia-cp/professional/apply.py \
-  --root /usr/local/hestia \
-  --source /caminho/revisado/hestia-cp \
-  --enable-services
+	--root /usr/local/hestia \
+	--source /caminho/revisado/hestia-cp \
+	--enable-services
 ```
 
 O aplicador não sobrescreve templates de cache diferentes nem modificações de autenticação desconhecidas. O File Manager legado permanece bloqueado. Se já estiver instalado, revise o procedimento de `--quarantine-filemanager` no guia anterior: ele preserva o componente fora do diretório web. O timer habilitado pelo aplicador é o de saúde; destinos de backup e seus timers exigem configuração própria.
@@ -31,7 +31,7 @@ Verifique o manifesto após aplicar:
 
 ```bash
 python3 /usr/local/hestia/professional/apply.py \
-  --root /usr/local/hestia --source /usr/local/hestia --refresh
+	--root /usr/local/hestia --source /usr/local/hestia --refresh
 ```
 
 `verified` verifica os arquivos comparados ao manifesto privado criado na aplicação. Não é assinatura independente nem atestado de inviolabilidade contra root. Uma nova versão oficial exige revisão; o aplicador não reaplica um core antigo sobre a atualização.
@@ -41,7 +41,7 @@ python3 /usr/local/hestia/professional/apply.py \
 Sem arquivo adicional, as mudanças ficam restritas a administradores. Para conceder a uma conta as três operações delegáveis, revise `professional/business-access.example.json`, substitua a conta e instale a configuração em `/usr/local/hestia/professional/business-access.json`, propriedade root e modo `0600`. O formato é:
 
 ```json
-{"schema":1,"grants":{"exampleuser":["dns-ttl","mail-rate","cache-profile"]}}
+{ "schema": 1, "grants": { "exampleuser": ["dns-ttl", "mail-rate", "cache-profile"] } }
 ```
 
 A conta só atua nos próprios domínios. Remover uma concessão bloqueia planos existentes e tarefas ainda não executadas. SSH e recursos não são delegáveis nesta revisão. Não há editor de papéis completo, SSO ou passkeys publicados nesta entrega.
@@ -70,8 +70,8 @@ O helper `professional/ssh_keys.py` oferece plano por padrão e escrita só com 
 
 ```bash
 python3 /usr/local/hestia/professional/ssh_keys.py \
-  --owner exampleuser --public-key /root/chave-publica.pub \
-  --expires 'DATA_FUTURA_COM_TIMEZONE' --from-network 192.0.2.1/32
+	--owner exampleuser --public-key /root/chave-publica.pub \
+	--expires 'DATA_FUTURA_COM_TIMEZONE' --from-network 192.0.2.1/32
 ```
 
 Substitua data e rede por valores reais aprovados. O resultado planeja uma linha `restrict,expiry-time=...`, desabilitando encaminhamentos e PTY; isso não impede por si só execução de comandos. A linha só entra em vigor no caminho de chaves usado pela política SSH. Uma chave já autorizada por outra linha é recusada, evitando aparência falsa de restrição temporária. Revogue pelo `--remove ID --apply`. Não há bastion, CA SSH ou chroot automático nesta entrega.
@@ -98,18 +98,18 @@ Se faltar energia ou um processo for encerrado entre a modificação e a gravaç
 
 ## Limites da entrega e próximos módulos
 
-| Área | Entregue nesta revisão | Ainda necessário |
-|---|---|---|
-| Operações | GUI, revisão, delegação limitada, senha/A2F, fila e reversão | Papéis completos, passkeys/SSO e permissões por equipe |
-| DNS/e-mail | TTL, diagnóstico e limite padrão de envio | DNS redundante homologado/DNSSEC, migração, quarentena e entregabilidade real |
-| Segurança | Mantidas correções A2F, WAF/Fail2Ban e bloqueio do File Manager | WAF fora do Apache, on-access de sites com GUI, cobertura efetiva e logs remotos |
-| Backups | Guard de retenção append_only sobre os fluxos existentes | Incrementais/snapshots, Object Lock externo, laboratório SQL e recuperação integral |
-| SSH | Políticas, conferência efetiva e chaves com prazo | Chroot, bastion, certificados e teste remoto |
-| Sites e cache | Cache público opcional | Staging, GitHub deploy/rollback, Redis/OPcache e purge pela GUI |
-| Recursos | Configuração da slice e diagnóstico de cobertura | Cobertura rígida de PHP/Docker/bancos, teste de carga e controle gráfico completo de CPU |
-| Observabilidade | Monitor anterior e histórico privado da nova operação | Alertas externos, métricas, SLO e central de incidentes |
-| Plataforma | Mantidos geradores e integrações opcionais existentes | Docker/Compose/NoSQL gráficos completos, OpenLiteSpeed e marketing instalado |
-| Multi-server | Nenhuma nova implementação de HA | Replicação, quórum, fencing, failover e testes de perda de nó |
-| Distribuição | Locks atualizados, CI e checksums | Assinatura de release, proveniência e âncora externa inviolável |
+| Área            | Entregue nesta revisão                                          | Ainda necessário                                                                         |
+| --------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Operações       | GUI, revisão, delegação limitada, senha/A2F, fila e reversão    | Papéis completos, passkeys/SSO e permissões por equipe                                   |
+| DNS/e-mail      | TTL, diagnóstico e limite padrão de envio                       | DNS redundante homologado/DNSSEC, migração, quarentena e entregabilidade real            |
+| Segurança       | Mantidas correções A2F, WAF/Fail2Ban e bloqueio do File Manager | WAF fora do Apache, on-access de sites com GUI, cobertura efetiva e logs remotos         |
+| Backups         | Guard de retenção append_only sobre os fluxos existentes        | Incrementais/snapshots, Object Lock externo, laboratório SQL e recuperação integral      |
+| SSH             | Políticas, conferência efetiva e chaves com prazo               | Chroot, bastion, certificados e teste remoto                                             |
+| Sites e cache   | Cache público opcional                                          | Staging, GitHub deploy/rollback, Redis/OPcache e purge pela GUI                          |
+| Recursos        | Configuração da slice e diagnóstico de cobertura                | Cobertura rígida de PHP/Docker/bancos, teste de carga e controle gráfico completo de CPU |
+| Observabilidade | Monitor anterior e histórico privado da nova operação           | Alertas externos, métricas, SLO e central de incidentes                                  |
+| Plataforma      | Mantidos geradores e integrações opcionais existentes           | Docker/Compose/NoSQL gráficos completos, OpenLiteSpeed e marketing instalado             |
+| Multi-server    | Nenhuma nova implementação de HA                                | Replicação, quórum, fencing, failover e testes de perda de nó                            |
+| Distribuição    | Locks atualizados, CI e checksums                               | Assinatura de release, proveniência e âncora externa inviolável                          |
 
 Consulte [AUDITORIA-1.2.md](AUDITORIA-1.2.md) para as evidências da revisão publicada. Nenhum item pendente deve ser anunciado como ativo só porque aparece nesta matriz.

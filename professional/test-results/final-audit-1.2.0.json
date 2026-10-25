@@ -1,0 +1,135 @@
+{
+  "generated_at": "2026-10-25T06:20:41.371126+00:00",
+  "scope": "published source, isolated tests, advisories and GitHub CI; no authenticated VPS deployment",
+  "functional_commit": "80f72f54ed85ce47924167d4444e288cc79b36ad",
+  "functional_tree": "a5dc51556fa9c4f46a7399aabf606191b837e5b9",
+  "download": {
+    "commit": "80f72f54ed85ce47924167d4444e288cc79b36ad",
+    "zip_sha256": "78b063ba5b036efca654d50732cb2920c98265c5d4bfb814c5b051629ed88522",
+    "blobs": 1695,
+    "checksums": 1694,
+    "git_mismatches": [],
+    "checksum_mismatches": []
+  },
+  "downloaded_release_checks": {
+    "status": "passed",
+    "python": {
+      "tests": 127,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "groups": 33,
+    "checksum_mismatches_after_tests": []
+  },
+  "github_ci": {
+    "run_id": 40168581919,
+    "job_id": 121094597449,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/sabas2025/hestia-cp/actions/runs/40168581919",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Install QA tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Fetch exact Composer-locked TOTP library for the isolated test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Mandatory tests without skipped checks",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Check advisories for locked dependencies",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Validate build and documentation tools after dependency updates",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17
+      }
+    ]
+  },
+  "negative_control": {
+    "status": "incomplete-or-failed",
+    "python": {
+      "tests": 127,
+      "failures": 3,
+      "errors": 11,
+      "skipped": 14
+    },
+    "expected_exit": 1
+  },
+  "advisories": {
+    "queried_at": "2026-10-25T06:09:28.177499+00:00",
+    "unique_locked_versions": 595,
+    "active_findings": 0,
+    "blocked_optional_components_with_findings": 2
+  },
+  "vps_accessed": false,
+  "installer_executed": false,
+  "production_services_validated": false,
+  "requested_enterprise_scope_complete": false,
+  "closure_changes": "Documentation, evidence and checksums only; runtime files unchanged from functional commit",
+  "pending": [
+    "VPS deployment and service acceptance",
+    "Full application/SQL restore and remote immutable retention",
+    "Full account CPU/RAM/process coverage",
+    "Passkeys/SSO and broad RBAC",
+    "External alerts and metrics",
+    "HA, replication and automatic failover",
+    "OpenLiteSpeed, real-time website antivirus GUI, complete Docker/NoSQL GUI",
+    "Staging/GitHub application deploy and full cache management"
+  ],
+  "markdown_validation": {
+    "files": 5,
+    "status": "passed"
+  }
+}

@@ -1,6 +1,6 @@
-> Capturas atuais das operações: [desktop 1.2](1.2/business-1440.png) e [celular 1.2](1.2/business-360.png). São renderizações da interface real com dados ilustrativos; nenhuma VPS conectada.
-
 # Prints da interface 1.1
+
+> Capturas atuais das operações: [desktop 1.2](1.2/business-1440.png) e [celular 1.2](1.2/business-360.png). São renderizações da interface real com dados ilustrativos; nenhuma VPS conectada.
 
 Capturas reais da página de prévia `professional/preview.html`, renderizada a partir do template PHP com fixtures explicitamente ilustrativas em 19/10/2026. Nenhuma VPS estava conectada. Não demonstram instalação de serviços, execução de backup remoto ou ativação de A2F em uma conta real.
 
