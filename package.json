@@ -47,7 +47,7 @@
 		"prettier-plugin-sh": "^0.19.0",
 		"prettier-plugin-sql": "^0.20.0",
 		"vitepress": "^1.6.4",
-		"vitest": "^4.1.12",
+		"vitest": "^5.0.5",
 		"vue": "^3.5.42",
 		"markdownlint": "0.41.1"
 	},
