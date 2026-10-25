@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "grants": {
+    "exampleuser": ["dns-ttl", "mail-rate", "cache-profile"]
+  }
+}

@@ -1,0 +1,6 @@
+#!/bin/bash
+# info: reviewed business operations; bounded JSON on stdin, fixed root helper
+set -eu
+[[ $EUID == 0 && $# == 2 && $1 =~ ^[a-z][a-z0-9_]{1,29}$ ]] || exit 1
+case "$2" in plan|apply|rollback|history|diagnose|coverage) ;; *) exit 1 ;; esac
+exec /usr/bin/python3 -I /usr/local/hestia/professional/business_entry.py --actor "$1" --op "$2"
