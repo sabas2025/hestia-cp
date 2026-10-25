@@ -6,6 +6,8 @@
 >
 > Os workflows originais foram preservados em `docs/upstream-workflows/` como referência. O diagnóstico SSH manual depende dos Secrets descritos no guia. O workflow Professional release checks executa testes e consultas de advisories, sem acesso à VPS.
 
+[Implantação por SSH/GitHub](IMPLANTACAO-VPS.md): fluxo manual com senha local na VPS, origem fixada, verificação de DNS e sistema limpo e execução em segundo plano. A publicação desse fluxo não significa instalação concluída.
+
 ## Correções 1.1.1
 
 Veja a [auditoria final da versão publicada](AUDITORIA-FINAL-1.1.1.md): correções verificadas, CI aprovado, evidências e funcionalidades ainda pendentes. Nenhuma implantação na VPS foi executada.

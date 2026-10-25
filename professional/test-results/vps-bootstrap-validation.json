@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-10-25T07:53:14.686741+00:00",
+  "status": "local-checks-passed",
+  "python": {
+    "tests": 149,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "groups": 33,
+  "new_bootstrap_tests": 22,
+  "new_workflow_shellcheck": "passed (-s bash)",
+  "markdown_validation": "passed",
+  "pinned_source": "f974fbf852270d0f0b1d0a451b5dea0c409119b4",
+  "pinned_source_files_verified": 1697,
+  "pinned_manifest_sha256": "c056c0a984a7791585897038c58e5b7c497661902597f839d38954fec44864ab",
+  "bootstrap_sha256": "a754c8afd65126f41e45fc4ea99435562edb7aae2a8010726ccc5132a9d558a2",
+  "real_ssh_diagnostic_run": 40172586048,
+  "installer_executed": false,
+  "live_deployment_completed": false,
+  "native_installation_in_tests": "mocked",
+  "initial_dns_observation": {
+    "hostname": "painel.ctba.top",
+    "resolver": "dns.google",
+    "A": "NXDOMAIN",
+    "AAAA": "NXDOMAIN",
+    "scope": "Observation before deployment; must be checked again on VPS"
+  }
+}

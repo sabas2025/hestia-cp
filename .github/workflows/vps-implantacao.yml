@@ -1,0 +1,87 @@
+name: Implantacao Hestia Professional na VPS
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Acao: conferir plano, instalar ou consultar estado'
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - install
+          - status
+permissions: {}
+concurrency:
+  group: vps-implantacao
+  cancel-in-progress: false
+jobs:
+  implantacao:
+    if: github.repository == 'sabas2025/hestia-cp' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 95
+    steps:
+      - name: Executar somente o comando restrito e acompanhar o estado
+        shell: bash
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          DEPLOY_ACTION: ${{ inputs.action }}
+        run: |
+          set -Eeuo pipefail
+          umask 077
+          for variable in VPS_HOST VPS_SSH_KEY VPS_KNOWN_HOSTS; do
+            [[ -n ${!variable:-} ]] || { printf 'Secret ausente: %s\n' "$variable" >&2; exit 1; }
+          done
+          [[ $VPS_HOST =~ ^[A-Za-z0-9][A-Za-z0-9.:-]*$ ]] || exit 1
+          case "$DEPLOY_ACTION" in plan|install|status) ;; *) exit 1 ;; esac
+          ssh_dir=$(mktemp -d "$RUNNER_TEMP/hestia-deploy.XXXXXXXX")
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$VPS_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          unset VPS_SSH_KEY VPS_KNOWN_HOSTS
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          ssh-keygen -y -P '' -f "$ssh_dir/key" >/dev/null
+          ssh-keygen -F "$VPS_HOST" -f "$ssh_dir/known_hosts" >/dev/null
+          ssh_options=(-F /dev/null -p 22 -i "$ssh_dir/key"
+            -o BatchMode=yes -o IdentitiesOnly=yes -o PasswordAuthentication=no
+            -o KbdInteractiveAuthentication=no -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$ssh_dir/known_hosts" -o GlobalKnownHostsFile=/dev/null
+            -o ForwardAgent=no -o ClearAllForwardings=yes -o ConnectTimeout=10
+            -o ConnectionAttempts=1 -o ServerAliveInterval=15 -o ServerAliveCountMax=2)
+          remote() {
+            timeout 240s ssh "${ssh_options[@]}" "root@$VPS_HOST" "/usr/local/sbin/hestia-github-implantacao $1"
+          }
+          state_of() {
+            python3 -c 'import json,sys; print(json.load(sys.stdin)["state"])'
+          }
+          if [[ $DEPLOY_ACTION != install ]]; then
+            remote "$DEPLOY_ACTION"
+            exit 0
+          fi
+          response=$(remote start)
+          printf '%s\n' "$response"
+          state=$(printf '%s' "$response" | state_of)
+          [[ $state == queued ]] || { printf 'A VPS nao confirmou a fila de instalacao.\n' >&2; exit 1; }
+          failures=0
+          for ((attempt=0; attempt<270; attempt++)); do
+            sleep 20
+            if response=$(remote status); then
+              failures=0
+            else
+              failures=$((failures+1))
+              printf 'Consulta SSH temporariamente indisponivel (%s/9).\n' "$failures"
+              ((failures<9)) || exit 1
+              continue
+            fi
+            printf '%s\n' "$response"
+            state=$(printf '%s' "$response" | state_of)
+            case "$state" in
+              succeeded) printf 'Instalacao e verificacoes locais concluidas. Validar HTTPS publico, login e servicos.\n'; exit 0 ;;
+              queued|running) ;;
+              *) printf 'Operacao interrompida ou recusada; consulte o log privado na VPS.\n' >&2; exit 1 ;;
+            esac
+          done
+          printf 'Prazo de acompanhamento encerrado; a tarefa da VPS pode continuar. Consulte status antes de qualquer nova acao.\n' >&2
+          exit 1
