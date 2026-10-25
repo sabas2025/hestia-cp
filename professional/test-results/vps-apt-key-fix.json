@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-10-25T08:50:54.733556+00:00",
+  "status": "source-validated-vps-recovery-pending",
+  "cause": "Package signing key selected instead of Hestia APT repository signing key",
+  "repository_key": {
+    "url": "https://apt.hestiacp.com/pubkey.gpg",
+    "sha256": "0020f1fb33bc0c53062a967b5c87fb51fd42550ab7ada15824cc1e4882b40dea",
+    "fingerprint": "159F0BD6EC2656F183BFD07BA189E93654F0B0E5",
+    "resolute_inrelease_signature": "verified",
+    "inspection_run": "https://github.com/sabas2025/hestia-cp/actions/runs/40177808155"
+  },
+  "helper_sha256": "9e82a71bf51697b5f365bf695d958d32fc9b29646aaca4e927035af8a2a0f210",
+  "source_pin": "f974fbf852270d0f0b1d0a451b5dea0c409119b4",
+  "working_copy_changes": [
+    "Suppress native welcome email",
+    "Replace exact incorrect key-hestia asset lock with pinned official APT key"
+  ],
+  "python": {
+    "tests": 162,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "groups_passed": 33,
+  "installer_executed_in_qa": false,
+  "vps_modified_by_this_validation": false,
+  "recovery_scope": "Console only; failed first install at second apt refresh; locks, stopped worker, native fresh-system preflight; private archive; authenticated apt update; hidden local password re-entry; no install",
+  "vps_acceptance": "Pending actual recovery and installer completion"
+}

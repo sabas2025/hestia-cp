@@ -14,6 +14,22 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify locked Hestia repository key and live Ubuntu 26.04 signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          trust_dir=$(mktemp -d)
+          trap 'rm -rf "$trust_dir"' EXIT
+          export GNUPGHOME="$trust_dir/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          key_hash=$(awk -F '\t' '$1=="key-hestia" {print $2}' install/assets.lock.tsv)
+          key_url=$(awk -F '\t' '$1=="key-hestia" {print $3}' install/assets.lock.tsv)
+          test "$key_url" = https://apt.hestiacp.com/pubkey.gpg
+          curl --fail --silent --show-error --proto '=https' --max-time 30 "$key_url" -o "$trust_dir/key"
+          printf '%s  %s\n' "$key_hash" "$trust_dir/key" | sha256sum -c -
+          gpg --batch --yes --dearmor --output "$trust_dir/keyring.gpg" "$trust_dir/key"
+          curl --fail --silent --show-error --proto '=https' --max-time 30 https://apt.hestiacp.com/dists/resolute/InRelease -o "$trust_dir/InRelease"
+          gpgv --status-fd=1 --keyring "$trust_dir/keyring.gpg" "$trust_dir/InRelease"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'

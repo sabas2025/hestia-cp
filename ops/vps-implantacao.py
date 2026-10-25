@@ -29,6 +29,13 @@ from contextlib import contextmanager
 SOURCE = 'f974fbf852270d0f0b1d0a451b5dea0c409119b4'
 SUMS_SHA256 = 'c056c0a984a7791585897038c58e5b7c497661902597f839d38954fec44864ab'
 EXPECTED_FILES = 1697
+APT_KEY_URL = 'https://apt.hestiacp.com/pubkey.gpg'
+APT_KEY_SHA256 = '0020f1fb33bc0c53062a967b5c87fb51fd42550ab7ada15824cc1e4882b40dea'
+APT_KEY_FINGERPRINT = '159F0BD6EC2656F183BFD07BA189E93654F0B0E5'
+APT_KEYRING_SHA256 = 'd847beeefee5be7abd8e6372422c6cdf40df040c0dba8d631fd30863e75ad782'
+OLD_KEYRING_SHA256 = 'd6513dc00832d51b0a3b4282c55b0497a463a7ac498682f29e04b05b22e2a363'
+OLD_APT_ASSET = 'key-hestia\tbdb3e3d077a4dde7de5ed1c28c4311a6a86d8f0583f94d38f0a597ef8f3afbd3\thttps://raw.githubusercontent.com/hestiacp/hestiacp/c14350f40c71b71f36e3945e42607d7d9c4980eb/install/deb/deb_signing.key'
+APT_ASSET = 'key-hestia\t'+APT_KEY_SHA256+'\t'+APT_KEY_URL
 TARGET_IP = '179.197.72.245'
 STATE = Path('/var/lib/hestia-github-deploy')
 CONFIG = Path('/etc/hestia-github-deploy')
@@ -36,8 +43,11 @@ HELPER = Path('/usr/local/sbin/hestia-github-implantacao')
 ROOT = Path('/usr/local/hestia')
 KEY = Path('/root/.ssh/github-hestia-diagnostico.pub')
 AUTHORIZED = Path('/root/.ssh/authorized_keys')
+APT_KEYRING = Path('/usr/share/keyrings/hestia-keyring.gpg')
+NATIVE_BACKUPS = Path('/root/hst_install_backups')
+NATIVE_LOCK = Path('/run/hestia-professional/install.lock')
 ENV = {'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-       'HOME':'/root','LC_ALL':'C','LANG':'C','DEBIAN_FRONTEND':'noninteractive'}
+       'HOME':'/root','LC_ALL':'C','LANG':'C','TERM':'dumb','DEBIAN_FRONTEND':'noninteractive'}
 
 def controlled(path):
     path = Path(path)
@@ -288,6 +298,116 @@ def suppress_welcome_email(source):
     if body.count(line)!=1: raise ValueError('Installer notification contract changed')
     path.write_text(body.replace(line,'# GitHub bootstrap: outbound welcome message disabled; credentials remain local.'))
 
+def correct_apt_asset(source):
+    # Only the verified working copy changes; keep the original source intact.
+    path = source/'install/assets.lock.tsv';body = path.read_text()
+    if body.splitlines().count(OLD_APT_ASSET)!=1 or any(line.startswith('key-hestia\t') and line!=OLD_APT_ASSET for line in body.splitlines()):
+        raise ValueError('Installer APT trust contract changed')
+    path.write_text(body.replace(OLD_APT_ASSET+'\n',APT_ASSET+'\n'))
+
+@contextmanager
+def native_install_lock():
+    private_dir(NATIVE_LOCK.parent)
+    fd = os.open(controlled(NATIVE_LOCK),os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    try:
+        s = os.fstat(fd)
+        if s.st_uid!=0 or not stat.S_ISREG(s.st_mode) or s.st_nlink!=1 or s.st_mode & 0o077:
+            raise ValueError('Unsafe native install lock')
+        fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB);yield
+    finally: os.close(fd)
+
+def replace_keyring(data):
+    # Do not use atomic(): /usr/share/keyrings must retain its public directory mode.
+    controlled(APT_KEYRING)
+    fd,name = tempfile.mkstemp(prefix='.hestia-recovery-',dir=APT_KEYRING.parent)
+    try:
+        with os.fdopen(fd,'wb') as stream:
+            stream.write(data);stream.flush();os.fsync(stream.fileno());os.fchmod(stream.fileno(),0o644)
+        os.replace(name,APT_KEYRING)
+    finally:
+        if os.path.exists(name): os.unlink(name)
+
+def apt_failure_evidence(job, cfg):
+    if job.get('state')!='failed' or job.get('phase')!='installing' or any(job.get(k)!=cfg[k] for k in ('source','hostname','username')):
+        raise ValueError('Recovery only supports a failed first installation at repository refresh')
+    ident = job.get('id','')
+    if not re.fullmatch(r'[a-f0-9]{32}',ident) or job.get('unit')!='hestia-install-'+ident:
+        raise ValueError('Unexpected installation ticket')
+    output = read_file(STATE/'installation.log').decode()
+    matches = re.findall(r'^ERROR: Refresh package indexes failed \(status 100\); see (/root/hst_install_backups/(hst_install-[0-9]{8}T[0-9]{6}Z-[0-9]+\.log))$',output,re.M)
+    if len(matches)!=1: raise ValueError('Repository failure not identified')
+    path = NATIVE_BACKUPS/matches[0][1];raw = read_file(path)
+    text = raw.decode()
+    events = re.findall(r'^\S+ ((?:START|END) .+)$',text,re.M)
+    expected = ['START Refresh package indexes','END Refresh package indexes status=0',
+                'START Install bootstrap dependencies','END Install bootstrap dependencies status=0',
+                'START Refresh package indexes','END Refresh package indexes status=100']
+    if events!=expected or not text.rstrip().endswith(expected[-1]) or 'NO_PUBKEY A189E93654F0B0E5' not in text or 'https://apt.hestiacp.com' not in text:
+        raise ValueError('Later, incomplete or different installation requires manual review')
+    return path,raw
+
+def recover_apt_key(reader=getpass.getpass, runner=checked, planner=plan, source_loader=bundle):
+    with locked(),native_install_lock():
+        cfg = settings();job = read_json(STATE/'job.json')
+        native_path,native_log = apt_failure_evidence(job,cfg)
+        if ROOT.exists() or (CONFIG/'admin-password').exists(): raise ValueError('Existing panel or pending credential requires review')
+        # list-units returns success even after --collect has unloaded the service.
+        unit = job['unit']+'.service'
+        state = runner(['/usr/bin/systemctl','list-units','--all','--no-pager','--no-legend','--plain',unit]).strip()
+        rows = [line.split() for line in state.splitlines()]
+        if rows and (len(rows)!=1 or len(rows[0])<4 or rows[0][0]!=unit or rows[0][2] not in ('inactive','failed')):
+            raise ValueError('Installation service is still active or unknown')
+        original = source_loader()
+        runner(['/bin/bash',str(original/'install/hst-install.sh'),'--preflight'])
+        old = read_file(APT_KEYRING,secret=False)
+        if hashlib.sha256(old).hexdigest() not in (OLD_KEYRING_SHA256,APT_KEYRING_SHA256):
+            raise ValueError('Unrecognized keyring; preserve it for manual review')
+        for name in ('job.json','installation.log','configuration-before.tar.gz','working'):
+            if not controlled(STATE/name).exists(): raise ValueError('Missing recovery evidence')
+        history = private_dir(STATE/'history')/('apt-key-'+job['id']+'-'+secrets.token_hex(8))
+        private_dir(history);atomic(history/'native-installation.log',native_log)
+        atomic(history/'keyring-before.gpg',old)
+        record = {'state':'preparing','phase':'verify-official-key','previous_job':job['id'],'source':SOURCE,'native_log':str(native_path),
+                  'fingerprint':APT_KEY_FINGERPRINT,'installer_executed':False,'created':time.time()}
+        write_json(history/'recovery.json',record)
+        moved = [];password_created = False;key_changed = False
+        try:
+            with tempfile.TemporaryDirectory(prefix='trust-',dir=history) as tmp:
+                stage = Path(tmp);key = stage/'pubkey';keyring = stage/'keyring.gpg';home = private_dir(stage/'gnupg')
+                runner(['/usr/bin/curl','--fail','--silent','--show-error','--proto','=https','--connect-timeout','10','--max-time','60','--output',str(key),APT_KEY_URL],timeout=70)
+                if hashlib.sha256(read_file(key,secret=False)).hexdigest()!=APT_KEY_SHA256: raise ValueError('Official repository key checksum changed')
+                details = runner(['/usr/bin/gpg','--homedir',str(home),'--batch','--show-keys','--with-colons','--fingerprint',str(key)])
+                fingerprints = [line.split(':')[9] for line in details.splitlines() if line.startswith('fpr:')]
+                if not fingerprints or fingerprints[0]!=APT_KEY_FINGERPRINT or sum(line.startswith('pub:') for line in details.splitlines())!=1:
+                    raise ValueError('Unexpected repository signing key')
+                runner(['/usr/bin/gpg','--homedir',str(home),'--batch','--yes','--dearmor','--output',str(keyring),str(key)])
+                data = read_file(keyring,secret=False)
+                if hashlib.sha256(data).hexdigest()!=APT_KEYRING_SHA256: raise ValueError('Unexpected keyring encoding')
+                replace_keyring(data);key_changed = True
+            record.update(phase='authenticated-apt-update');write_json(history/'recovery.json',record)
+            fd = os.open(history/'apt-update.log',os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            with os.fdopen(fd,'wb') as log: runner(['/usr/bin/apt-get','-o','APT::Update::Error-Mode=any','update'],timeout=300,log=log)
+            record.update(phase='local-password');write_json(history/'recovery.json',record)
+            password = reader('Senha do administrador Hestia (14-128 caracteres): ')
+            confirm = reader('Repita a senha: ')
+            if password!=confirm or not valid_password(password): raise ValueError('Invalid or mismatched local password')
+            atomic(CONFIG/'admin-password',password.encode());password_created = True;del password,confirm
+            record.update(phase='fresh-installation-plan');write_json(history/'recovery.json',record)
+            result = planner()
+            if result['state']!='ready': raise ValueError('Fresh installation plan is blocked')
+            record.update(phase='archive-failed-attempt');write_json(history/'recovery.json',record)
+            # Move the ticket last. A partial archive is rolled back on ordinary errors.
+            for name in ('working','installation.log','configuration-before.tar.gz','job.json'):
+                (STATE/name).rename(history/name);moved.append(name)
+            record.update(state='recovered',phase='ready-for-new-plan',updated=time.time());write_json(history/'recovery.json',record)
+        except BaseException:
+            for name in reversed(moved): (history/name).rename(STATE/name)
+            if password_created: controlled(CONFIG/'admin-password').unlink()
+            if key_changed: replace_keyring(old)
+            record.update(state='failed',updated=time.time());write_json(history/'recovery.json',record);raise
+    return {'state':'recovered','username':cfg['username'],'history':str(history),'apt_signature_check':'passed',
+            'installer_executed':False,'password_sent_to_github':False,'next':'plan, then start'}
+
 def backup_configuration(archive_path):
     fd = os.open(archive_path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,'wb') as stream,tarfile.open(fileobj=stream,mode='w:gz') as archive:
@@ -308,7 +428,7 @@ def worker(ident, runner=checked, planner=plan, source_loader=bundle):
             if planner()['state']!='ready': raise ValueError('Preflight changed')
             original = source_loader();working = STATE/'working'
             if working.exists(): raise ValueError('Existing workspace requires manual review')
-            shutil.copytree(original,working);suppress_welcome_email(working)
+            shutil.copytree(original,working);suppress_welcome_email(working);correct_apt_asset(working)
             phase('backup-configuration')
             backup_configuration(STATE/'configuration-before.tar.gz')
             phase('installing')
@@ -347,12 +467,15 @@ def main():
         if len(sys.argv)!=1: raise ValueError('Forced SSH command takes no direct arguments')
         action = ssh_action(os.environ.get('SSH_ORIGINAL_COMMAND',''));args = None
     else:
-        parser = argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('setup','set-user','plan','start','status','worker'))
+        parser = argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('setup','set-user','recover-apt-key','plan','start','status','worker'))
         parser.add_argument('id',nargs='?');parser.add_argument('--hostname');parser.add_argument('--email');parser.add_argument('--username');args = parser.parse_args();action = args.action
     if action=='diagnostic':
         os.execve('/usr/local/sbin/hestia-github-diagnostico',['hestia-github-diagnostico'],ENV)
     if action=='setup': result = setup(args.hostname,args.email,username=args.username or 'admin')
     elif action=='set-user': result = set_user(args.username)
+    elif action=='recover-apt-key':
+        if not sys.stdin.isatty(): raise ValueError('Recovery requires the interactive root console')
+        result = recover_apt_key()
     elif action=='plan': result = plan()
     elif action=='start': result = start()
     elif action=='worker': result = worker(args.id or '')

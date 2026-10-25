@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import stat
 import subprocess
 import sys
@@ -24,18 +25,19 @@ d=importlib.util.module_from_spec(spec);sys.modules[spec.name]=d;spec.loader.exe
 class VPSDeployTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.base=Path(self.temp.name)
-        for name,value in [('STATE',self.base/'state'),('CONFIG',self.base/'config'),('ROOT',self.base/'installed'),('KEY',self.base/'ssh/public.pub'),('AUTHORIZED',self.base/'ssh/authorized_keys')]:
+        for name,value in [('STATE',self.base/'state'),('CONFIG',self.base/'config'),('ROOT',self.base/'installed'),('KEY',self.base/'ssh/public.pub'),('AUTHORIZED',self.base/'ssh/authorized_keys'),('APT_KEYRING',self.base/'keyrings/hestia-keyring.gpg'),('NATIVE_BACKUPS',self.base/'native-backups'),('NATIVE_LOCK',self.base/'native-lock/install.lock')]:
             patcher=patch.object(d,name,value);patcher.start();self.addCleanup(patcher.stop)
         d.private_dir(d.CONFIG);d.private_dir(d.STATE)
         d.write_json(d.CONFIG/'config.json',{'hostname':'panel.example.com','email':'admin@example.com','username':'admin','source':d.SOURCE})
         d.atomic(d.CONFIG/'admin-password',b'SyntheticPassword123!')
         self.source=self.base/'source';(self.source/'install').mkdir(parents=True)
         (self.source/'install/hst-install-ubuntu.sh').write_text('before\ncat $tmpfile | $send_mail -s "Hestia Control Panel" $email\nafter\n')
+        (self.source/'install/assets.lock.tsv').write_text(d.OLD_APT_ASSET+'\n')
     def ready(self):return {'state':'ready','hostname':'panel.example.com','url':'https://panel.example.com:8083'}
     def queue(self):return d.start(runner=lambda args:'',planner=self.ready)
     def test_ssh_allowlist_rejects_shell_commands_and_setup(self):
         for action in ('plan','start','status'):self.assertEqual(d.ssh_action(str(d.HELPER)+' '+action),action)
-        for cmd in ('bash','id',str(d.HELPER)+' setup',str(d.HELPER)+' set-user --username sabasadmin',str(d.HELPER)+' start; id',str(d.HELPER)+' worker abc',''):
+        for cmd in ('bash','id',str(d.HELPER)+' setup',str(d.HELPER)+' set-user --username sabasadmin',str(d.HELPER)+' recover-apt-key',str(d.HELPER)+' start; id',str(d.HELPER)+' worker abc',''):
             with self.subTest(cmd=cmd),self.assertRaises(ValueError):d.ssh_action(cmd)
     def test_configuration_and_password_validation(self):
         self.assertTrue(d.valid_password('SyntheticPassword123!'))
@@ -163,6 +165,111 @@ class VPSDeployTests(unittest.TestCase):
         d.suppress_welcome_email(self.source)
         self.assertNotIn('cat $tmpfile | $send_mail',(self.source/'install/hst-install-ubuntu.sh').read_text())
         with self.assertRaises(ValueError):d.suppress_welcome_email(self.source)
+    def test_working_copy_uses_repository_key_and_preserves_original(self):
+        target=self.base/'corrected';shutil.copytree(self.source,target)
+        d.correct_apt_asset(target)
+        self.assertEqual((target/'install/assets.lock.tsv').read_text(),d.APT_ASSET+'\n')
+        self.assertEqual((self.source/'install/assets.lock.tsv').read_text(),d.OLD_APT_ASSET+'\n')
+        with self.assertRaises(ValueError):d.correct_apt_asset(target)
+        (target/'install/assets.lock.tsv').write_text(d.OLD_APT_ASSET+'\n'+d.OLD_APT_ASSET+'\n')
+        with self.assertRaises(ValueError):d.correct_apt_asset(target)
+    def failed_repository_fixture(self):
+        job=self.queue();job.update(state='failed',phase='installing');d.write_json(d.STATE/'job.json',job)
+        (d.CONFIG/'admin-password').unlink()
+        (d.STATE/'working').mkdir();(d.STATE/'working/evidence').write_text('preserve')
+        d.atomic(d.STATE/'configuration-before.tar.gz',b'synthetic private backup')
+        native_name='hst_install-20261025T083303Z-18039.log'
+        d.atomic(d.STATE/'installation.log',('ERROR: Refresh package indexes failed (status 100); see /root/hst_install_backups/'+native_name+'\n').encode())
+        events=['START Refresh package indexes','END Refresh package indexes status=0',
+                'START Install bootstrap dependencies','END Install bootstrap dependencies status=0',
+                'START Refresh package indexes']
+        text=''.join('2026-10-25T08:33:03Z '+v+'\n' for v in events)
+        text+='W: https://apt.hestiacp.com resolute NO_PUBKEY A189E93654F0B0E5\n'
+        text+='2026-10-25T08:33:25Z END Refresh package indexes status=100\n'
+        d.atomic(d.NATIVE_BACKUPS/native_name,text.encode())
+        d.private_dir(d.APT_KEYRING.parent);d.APT_KEYRING.parent.chmod(0o755)
+        home=d.private_dir(self.base/'old-gpg')
+        d.checked(['/usr/bin/gpg','--homedir',str(home),'--batch','--yes','--dearmor','--output',str(d.APT_KEYRING),str(ROOT/'install/deb/deb_signing.key')])
+        self.recovery_calls=[]
+        return job,d.NATIVE_BACKUPS/native_name
+    def recovery_runner(self,args,timeout=60,log=None):
+        self.recovery_calls.append(args)
+        if args[0]=='/usr/bin/systemctl':return ''
+        if args[0]=='/bin/bash':return 'Inspection result: PASS\n'
+        if args[0]=='/usr/bin/curl':
+            key=Path(args[args.index('--output')+1]);key.write_bytes((ROOT/'professional/tests/fixtures/hestia-apt-key.asc').read_bytes());key.chmod(0o600);return ''
+        if args[0]=='/usr/bin/gpg':return d.checked(args,timeout=timeout,log=log)
+        if args[0]=='/usr/bin/apt-get':
+            self.assertIsNotNone(log);log.write(b'synthetic authenticated update\n');return ''
+        raise AssertionError('Unexpected recovery command: '+str(args))
+    def recover_fixture(self,runner=None,reader=None,planner=None):
+        return d.recover_apt_key(reader=reader or (lambda prompt:'SyntheticPassword123!'),runner=runner or self.recovery_runner,
+                                 planner=planner or self.ready,source_loader=lambda:self.source)
+    def test_repository_recovery_preserves_evidence_and_never_installs(self):
+        job,native=self.failed_repository_fixture();native_before=native.read_bytes()
+        value=self.recover_fixture();history=Path(value['history'])
+        self.assertEqual(value['state'],'recovered');self.assertFalse(value['installer_executed'])
+        self.assertEqual(d.status()['state'],'not-started');self.assertEqual(native.read_bytes(),native_before)
+        self.assertEqual(d.read_json(history/'job.json')['id'],job['id'])
+        self.assertEqual((history/'working/evidence').read_text(),'preserve')
+        self.assertEqual((history/'keyring-before.gpg').stat().st_mode&0o777,0o600)
+        self.assertEqual(hashlib.sha256(d.APT_KEYRING.read_bytes()).hexdigest(),d.APT_KEYRING_SHA256)
+        self.assertEqual(d.APT_KEYRING.stat().st_mode&0o777,0o644);self.assertEqual(d.APT_KEYRING.parent.stat().st_mode&0o777,0o755)
+        self.assertTrue(d.valid_password(d.read_file(d.CONFIG/'admin-password').decode()))
+        self.assertNotIn('--apply',str(self.recovery_calls));self.assertNotIn('SyntheticPassword',str(value)+str(self.recovery_calls))
+        self.assertEqual([a for a in self.recovery_calls if a[0]=='/usr/bin/apt-get'],[['/usr/bin/apt-get','-o','APT::Update::Error-Mode=any','update']])
+    def test_recovery_rejects_later_stage_without_mutations(self):
+        self.failed_repository_fixture();path=next(d.NATIVE_BACKUPS.glob('*.log'))
+        path.write_text(path.read_text()+'2026-10-25T08:34:00Z START Upgrade installed packages\n')
+        before=d.APT_KEYRING.read_bytes()
+        with self.assertRaises(ValueError):self.recover_fixture()
+        self.assertEqual(self.recovery_calls,[]);self.assertEqual(d.APT_KEYRING.read_bytes(),before)
+        self.assertEqual(d.status()['state'],'failed');self.assertFalse((d.STATE/'history').exists())
+    def test_recovery_rejects_running_unit_and_installed_panel(self):
+        self.failed_repository_fixture()
+        with self.assertRaises(ValueError):self.recover_fixture(runner=lambda args:'active\n')
+        d.ROOT.mkdir()
+        with self.assertRaises(ValueError):self.recover_fixture()
+        self.assertFalse((d.CONFIG/'admin-password').exists())
+    def test_recovery_rejects_wrong_key_before_replacing_keyring(self):
+        self.failed_repository_fixture();before=d.APT_KEYRING.read_bytes()
+        def runner(args,**kwargs):
+            result=self.recovery_runner(args,**kwargs)
+            if args[0]=='/usr/bin/curl':Path(args[args.index('--output')+1]).write_text('tampered key')
+            return result
+        with self.assertRaises(ValueError):self.recover_fixture(runner=runner)
+        self.assertEqual(d.APT_KEYRING.read_bytes(),before);self.assertEqual(d.status()['state'],'failed')
+        self.assertFalse(any(a[0]=='/usr/bin/apt-get' for a in self.recovery_calls))
+    def test_failed_authenticated_update_restores_key_and_never_prompts(self):
+        self.failed_repository_fixture();before=d.APT_KEYRING.read_bytes()
+        def runner(args,**kwargs):
+            if args[0]=='/usr/bin/apt-get':raise RuntimeError('APT signature failure')
+            return self.recovery_runner(args,**kwargs)
+        with self.assertRaises(RuntimeError):self.recover_fixture(runner=runner,reader=lambda prompt:self.fail('must not ask for password'))
+        self.assertEqual(d.APT_KEYRING.read_bytes(),before);self.assertEqual(d.status()['state'],'failed')
+        self.assertFalse((d.CONFIG/'admin-password').exists());self.assertTrue((d.STATE/'working/evidence').exists())
+    def test_failed_recovery_plan_restores_key_and_removes_new_password(self):
+        self.failed_repository_fixture();before=d.APT_KEYRING.read_bytes()
+        with self.assertRaises(ValueError):self.recover_fixture(planner=lambda:{'state':'blocked'})
+        self.assertEqual(d.APT_KEYRING.read_bytes(),before);self.assertFalse((d.CONFIG/'admin-password').exists())
+        self.assertEqual(d.status()['state'],'failed');self.assertTrue((d.STATE/'installation.log').exists())
+    def test_recovery_archive_error_restores_all_current_evidence(self):
+        self.failed_repository_fixture();before=d.APT_KEYRING.read_bytes();original_rename=Path.rename
+        def rename(path,target):
+            if path==d.STATE/'job.json':raise OSError('synthetic archive failure')
+            return original_rename(path,target)
+        with patch.object(Path,'rename',rename),self.assertRaises(OSError):self.recover_fixture()
+        self.assertEqual(d.APT_KEYRING.read_bytes(),before);self.assertEqual(d.status()['state'],'failed')
+        self.assertTrue((d.STATE/'working/evidence').exists());self.assertTrue((d.STATE/'configuration-before.tar.gz').exists())
+        self.assertFalse((d.CONFIG/'admin-password').exists())
+    def test_recovery_refuses_unrecognized_current_key_and_invalid_password(self):
+        self.failed_repository_fixture();before=d.APT_KEYRING.read_bytes()
+        d.APT_KEYRING.write_bytes(b'foreign keyring')
+        with self.assertRaises(ValueError):self.recover_fixture()
+        self.assertEqual(d.APT_KEYRING.read_bytes(),b'foreign keyring')
+        d.APT_KEYRING.write_bytes(before)
+        with self.assertRaises(ValueError):self.recover_fixture(reader=lambda prompt:'weak')
+        self.assertEqual(d.APT_KEYRING.read_bytes(),before);self.assertEqual(d.status()['state'],'failed')
     def test_worker_success_validates_then_removes_local_password(self):
         job=self.queue();calls=[]
         def runner(args,timeout=60,log=None):

@@ -39,7 +39,7 @@ O perfil instala Nginx com Apache, PHP 8.4, MariaDB, BIND, Exim/Dovecot/Sieve, C
 
 O estado público distingue `queued`, `running`, `succeeded`, `failed`, `launch-failed`, `queue-expired` e `interrupted-review`. `succeeded` exige término do instalador, manifesto instalado verificado, verificações de configuração/saúde, serviço Hestia ativo e conexão TCP local na porta 8083. Não comprova login real, entrega de e-mail, eficácia do WAF/limites, HTTPS público com certificado confiável nem recuperação completa de backups.
 
-A mensagem inicial de boas-vindas por e-mail é suprimida por uma substituição local exata e revisada no script Ubuntu, na cópia de trabalho. O original verificado permanece preservado; os demais arquivos são os da revisão fixada. Isso não desativa serviços de e-mail instalados. O instalador não publica a senha nem envia mensagem de boas-vindas por esse bootstrap.
+A mensagem inicial de boas-vindas por e-mail é suprimida por uma substituição local exata e revisada no script Ubuntu, na cópia de trabalho. O original verificado permanece preservado; a referência da chave APT também recebe a correção exata descrita adiante; os demais arquivos são os da revisão fixada. Isso não desativa serviços de e-mail instalados. O instalador não publica a senha nem envia mensagem de boas-vindas por esse bootstrap.
 
 O serviço tem prazo máximo de 90 minutos; o comando nativo tem timeout menor. O workflow acompanha por até aproximadamente 90 minutos e tolera falhas transitórias de consulta SSH. Cancelar o job GitHub não desfaz nem necessariamente interrompe a instalação na VPS. Use a ação `status` ou o console para consultar antes de qualquer tentativa adicional.
 
@@ -55,7 +55,7 @@ Todos ficam na VPS, sem upload como artifact do GitHub:
 - `/var/lib/hestia-github-deploy/installation.log`: saída privada do instalador, root/0600.
 - `/var/lib/hestia-github-deploy/configuration-before.tar.gz`: SSH, APT, rede e identificação anteriores; contém arquivos sensíveis, root/0600.
 - `/var/lib/hestia-github-deploy/source`: origem fixada, conferida por manifesto.
-- `/var/lib/hestia-github-deploy/working`: cópia efetivamente usada, com a supressão da mensagem inicial.
+- `/var/lib/hestia-github-deploy/working`: cópia efetivamente usada, com a supressão da mensagem inicial e a correção da referência da chave APT.
 
 Os testes do bootstrap usam fixtures e simulação de comandos externos; não executam um instalador completo nem alteram SSH do host de testes. O diagnóstico real anterior só comprovou leitura. A implantação real só pode ser declarada após o worker na VPS e a verificação de seu resultado.
 
@@ -80,3 +80,27 @@ Esse comando altera somente a configuração privada do bootstrap, com backup da
 Depois de atualizar o helper instalado e executar `set-user`, rode `plan` novamente no GitHub. `installer_args` passa o usuário configurado ao instalador nativo; o instalador grava esse nome como `ROOT_USER`. O login do painel passa a ser o nome escolhido, usando a senha definida anteriormente.
 
 [Evidência da correção de nome](professional/test-results/vps-username-fix.json) e [suíte atualizada](professional/test-results/verification-vps-username-fix.json). As evidências anteriores de 149 testes correspondem à revisão inicial do bootstrap, sem esta atualização.
+
+
+## Recuperação da falha de chave APT em 25/10/2026
+
+A primeira instalação parou na segunda atualização de índices, antes de `Upgrade installed packages` e `Install selected packages`. O lock usava `install/deb/deb_signing.key` (chave de assinatura de pacotes), que não verifica os metadados APT do Hestia. A referência correta é `https://apt.hestiacp.com/pubkey.gpg`, como no instalador oficial. A assinatura do `resolute/InRelease` foi validada na [inspeção isolada 40177808155](https://github.com/sabas2025/hestia-cp/actions/runs/40177808155), sem conectar à VPS.
+
+A correção fixa SHA-256 `0020f1fb33bc0c53062a967b5c87fb51fd42550ab7ada15824cc1e4882b40dea` e fingerprint primário `159F0BD6EC2656F183BFD07BA189E93654F0B0E5`. O arquivo `install/assets.lock.tsv` foi corrigido. Para a origem antiga fixada pelo bootstrap, somente essa linha é substituída na cópia de trabalho depois da verificação integral da origem; contratos diferentes ou duplicados são recusados. A origem preservada continua imutável. O CI agora verifica o hash da chave oficial e a assinatura real do repositório Ubuntu 26.04.
+
+Após baixar e verificar a revisão corrigida do helper, execute **somente no console root interativo**:
+
+```bash
+/usr/local/sbin/hestia-github-implantacao recover-apt-key
+/usr/local/sbin/hestia-github-implantacao plan
+```
+
+`recover-apt-key` é restrito à tentativa inicial com estado `failed/installing`, à identidade da configuração atual e à sequência exata de eventos do log: primeira atualização aprovada, dependências iniciais aprovadas e segunda atualização encerrada em 100 com `NO_PUBKEY A189E93654F0B0E5`. O comando adquire os locks de implantação e instalação nativa, verifica que o serviço anterior está inativo/descarregado, executa o preflight de sistema limpo e recusa painel existente, credencial pendente, evidência ausente ou chave instalada desconhecida. Tentativas que chegaram à atualização de pacotes ou a etapas posteriores exigem outra análise.
+
+A recuperação verifica hash e fingerprint da chave oficial, substitui atomicamente somente `/usr/share/keyrings/hestia-keyring.gpg` e exige que `apt-get update` termine sem erro. Não usa `trusted=yes`, `--allow-unauthenticated`, mudança de política criptográfica nem importação por ID curto. Preserva o modo público do diretório de keyrings.
+
+Depois solicita novamente a senha, duas vezes, com entrada oculta. A senha anterior foi removida pelo worker quando a tentativa falhou; escolha a senha local do administrador configurado, sem colocá-la no GitHub ou no chat. O comando mantém hostname, e-mail, usuário do painel e autorizações SSH.
+
+Com o novo plano aprovado, arquiva a tentativa anterior em `/var/lib/hestia-github-deploy/history/apt-key-*`: ticket, workspace, log, backup de configuração, cópia do log nativo, keyring anterior, resultado do APT e registro `recovery.json`, todos protegidos pelo diretório root privado. O log nativo original permanece no lugar. Não remove bancos, usuários, grupos ou pacotes. Em erro normal, restaura os arquivos movidos e a chave anterior e remove a nova senha. Se houver desligamento/encerramento forçado durante o arquivamento, preserve as duas pastas e faça revisão manual; não há retomada automática.
+
+O retorno `state: recovered` significa **recuperação preparada, sem executar o instalador**. Consulte `plan`; somente com `state: ready`, execute `start` no console ou `install` no workflow. Não execute novamente `setup` nem remova `job.json` manualmente. Uma segunda execução de recuperação após sucesso é recusada. O aviso antigo de `TERM` era secundário; o helper também define `TERM=dumb`.

@@ -144,6 +144,22 @@ class InstallTests(unittest.TestCase):
             self.assertEqual(shell('hst_publish_config "$1"',[str(p)]).returncode,0)
             self.assertEqual(p.read_text(),"A='first'\nZ='last'\n");self.assertEqual(p.stat().st_mode&0o777,0o640)
 
+    def test_hestia_apt_key_is_repository_key_not_deb_signing_key(self):
+        key=ROOT/'professional/tests/fixtures/hestia-apt-key.asc'
+        expected='0020f1fb33bc0c53062a967b5c87fb51fd42550ab7ada15824cc1e4882b40dea'
+        self.assertEqual(hashlib.sha256(key.read_bytes()).hexdigest(),expected)
+        rows=[line.split('\t') for line in (ROOT/'install/assets.lock.tsv').read_text().splitlines() if line.startswith('key-hestia\t')]
+        self.assertEqual(rows,[['key-hestia',expected,'https://apt.hestiacp.com/pubkey.gpg']])
+        with tempfile.TemporaryDirectory() as td:
+            folder=Path(td);home=folder/'gnupg';home.mkdir(mode=0o700)
+            # Keep the fixture in an argument rather than interpolating a shell path.
+            code='HST_BUNDLE_ROOT=$1; HST_STAGE_DIR=$2; export GNUPGHOME=$3; FIXTURE=$4; hst_download() { cp -- "$FIXTURE" "$2"; }; hst_keyring hestia "$HST_STAGE_DIR/repository.gpg"'
+            result=shell(code,[str(ROOT),str(folder),str(home),str(key)])
+            self.assertEqual(result.returncode,0,result.stderr)
+            inspected=subprocess.run(['gpg','--homedir',str(home),'--batch','--show-keys','--with-colons','--fingerprint',str(folder/'repository.gpg')],capture_output=True,text=True,check=True)
+            self.assertIn('fpr:::::::::159F0BD6EC2656F183BFD07BA189E93654F0B0E5:',inspected.stdout)
+            self.assertNotIn('C29C802552C33D6149B8D32642C5B2130A1F7714',inspected.stdout)
+
     def test_no_unsafe_old_install_constructs(self):
         for name in ('debian','ubuntu'):
             text=(ROOT/f'install/hst-install-{name}.sh').read_text()
