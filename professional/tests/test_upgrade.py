@@ -64,6 +64,20 @@ class UpgradeTests(unittest.TestCase):
         root_json(self.root/'data/professional-platform/jobs/active.json',{'state':'running'})
         with self.assertRaises(ValueError):upgrade.preflight(self.root,self.source,self.fs)
 
+    def test_new_native_service_targets_are_backed_up_and_restored_from_old_manifest(self):
+        from mfa import root_json
+        names={'bin/v-start-service','bin/v-stop-service','bin/v-restart-service'}
+        manifest=self.root/'professional/deployment.json';old=json.loads(manifest.read_text())
+        old['overlay']='1.4.0';old['files']=[item for item in old['files'] if item['file'] not in names]
+        root_json(manifest,old)
+        for name in names:(self.root/name).write_text('#!/bin/bash\n# original native fixture\n')
+        self.assertEqual(overlay.verify_deployment(self.root)['state'],'verified')
+        self.assertEqual(upgrade.preflight(self.root,self.source,self.fs)['from'],'1.4.0')
+        def fail(root):raise RuntimeError('synthetic post-update failure')
+        with self.assertRaises(RuntimeError):upgrade.run_upgrade(self.root,self.source,self.fs,self.runner,fail,lambda r:None)
+        for name in names:self.assertEqual((self.root/name).read_text(),'#!/bin/bash\n# original native fixture\n')
+        self.assertEqual(json.loads(manifest.read_text())['overlay'],'1.4.0')
+
 class DependencyTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.fs=Path(self.tmp.name)

@@ -44,7 +44,7 @@ def main():
         for script in ('editor.js','platform.js'):run('Tools JavaScript syntax '+script,[node,'--check',str(ROOT/'web/professional'/script)])
     if node:run('Node project example syntax',[node,'--check',str(ROOT/'professional/node-server.example.mjs')])
     else: result['checks'].append({'name':'Node/JavaScript','status':'unavailable'})
-    for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa','v-add-sys-web-terminal'):run('Bash protected entrypoint syntax '+name,['bash','-n',str(ROOT/'bin'/name)])
+    for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa','v-add-sys-web-terminal','v-start-service','v-stop-service','v-restart-service'):run('Bash protected entrypoint syntax '+name,['bash','-n',str(ROOT/'bin'/name)])
     run('Python syntax',[sys.executable,'-m','compileall','-q',str(ROOT/'professional')])
     if php:run('Whole-tree source syntax',[sys.executable,str(ROOT/'professional/tests/static_syntax.py')])
     if os.environ.get('NGINX_BINARY') or shutil.which('nginx'):

@@ -28,6 +28,11 @@ source_conf "$HESTIA/conf/hestia.conf"
 check_args '1' "$#" 'SERVICE [RESTART]'
 is_format_valid 'service' 'restart'
 
+# The server list exposes this display name; systemd uses the package unit.
+if [ "$service" = "web-terminal" ]; then
+	service='hestia-web-terminal'
+fi
+
 #----------------------------------------------------------#
 #                       Action                             #
 #----------------------------------------------------------#

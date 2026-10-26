@@ -28,6 +28,11 @@ source_conf "$HESTIA/conf/hestia.conf"
 check_args '1' "$#" 'SERVICE'
 is_format_valid 'service'
 
+# The server list exposes this display name; systemd uses the package unit.
+if [ "$service" = "web-terminal" ]; then
+	service='hestia-web-terminal'
+fi
+
 #----------------------------------------------------------#
 #                       Action                             #
 #----------------------------------------------------------#
@@ -41,8 +46,10 @@ else
 fi
 
 for service in $service_list; do
+	result=0
 	if [ "$service" = "iptables" ]; then
 		$BIN/v-update-firewall
+		result=$?
 	else
 		systemctl start "$service"
 		result=$?
@@ -52,7 +59,7 @@ for service in $service_list; do
 			$BIN/v-log-action "system" "Info" "System" "Service started (Name: $service)."
 		fi
 	fi
-	check_result $? "ERROR: $service start failed" "$E_RESTART"
+	check_result "$result" "ERROR: $service start failed" "$E_RESTART"
 done
 
 #----------------------------------------------------------#

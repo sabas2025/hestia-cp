@@ -25,6 +25,7 @@ UNITS = ['hestia-professional-health.service','hestia-professional-health.timer'
          'hestia-professional-backup@.service','hestia-professional-backup@.timer',
          'hestia-professional-cloud-backup@.service','hestia-professional-cloud-backup@.timer']
 EXTRA = ['professional/deployment.json','data/professional/deployment-status.json','web/templates/pages/edit_web.php','bin/v-add-sys-web-terminal',
+         'bin/v-start-service','bin/v-stop-service','bin/v-restart-service',
          'data/professional/health.json','professional/hst-common.sh','professional/bundle/install/assets.lock.tsv',
          'data/api/professional-readonly','web/templates/includes/panel.php',
          'bin/v-add-sys-filemanager','bin/v-add-user-composer','bin/v-add-sys-roundcube',
@@ -93,7 +94,7 @@ def syntax(source, root, runner=command):
     php=root/'php/bin/php'
     if not php.is_file():raise ValueError('Native panel PHP unavailable')
     for path in (source/'web/professional').glob('*.php'):runner([str(php),'-n','-l',str(path)])
-    for name in ('v-professional-editor','v-professional-platform','v-professional-business','v-professional-mfa'):
+    for name in ('v-professional-editor','v-professional-platform','v-professional-business','v-professional-mfa','v-start-service','v-stop-service','v-restart-service'):
         runner(['/bin/bash','-n',str(source/'bin'/name)])
 
 def run_upgrade(root,source,fs=Path('/'),runner=command,integrate=None,check=None):

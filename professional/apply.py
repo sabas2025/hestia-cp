@@ -145,7 +145,7 @@ def quarantine_file_manager(root):
 def source_files(source):
     files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
     files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
-    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-professional-editor', 'v-professional-platform', 'v-backup-user', 'v-add-sys-web-terminal')]
+    files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-professional-editor', 'v-professional-platform', 'v-backup-user', 'v-add-sys-web-terminal', 'v-start-service', 'v-stop-service', 'v-restart-service')]
     files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php', 'web/templates/pages/edit_web.php')]
     files += [source / "web/css/themes/custom/professional.css"]
     files += [source / 'professional/mfa-logrotate.conf']
