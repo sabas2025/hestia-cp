@@ -32,7 +32,7 @@ jobs:
           gpg --batch --yes --dearmor --output "$trust_dir/keyring.gpg" "$trust_dir/key"
           curl --fail --silent --show-error --proto '=https' --max-time 30 https://apt.hestiacp.com/dists/resolute/InRelease -o "$trust_dir/InRelease"
           gpgv --status-fd=1 --keyring "$trust_dir/keyring.gpg" "$trust_dir/InRelease"
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version: '24'
       - name: Install QA tools
