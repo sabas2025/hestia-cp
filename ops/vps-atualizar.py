@@ -21,9 +21,9 @@ import time
 import urllib.request
 import zipfile
 
-SOURCE = '2c4fed6001164453ad68ada6fd35ce4459f2bef3'
-SUMS_SHA256 = '830ffd0cacf44fd97ed9c83f873d41138c4d41e79605cd41f629f8b69b314fa1'
-EXPECTED_FILES = 1745
+SOURCE = '4039a1936bdc0ae706899635e472f8eebd3aa101'
+SUMS_SHA256 = 'd40bdbdae7e0a7b40306c651bdc794c97f5725127c5327d339148a75ab11fd79'
+EXPECTED_FILES = 1750
 STATE = Path('/var/lib/hestia-professional-upgrade')
 HELPER = Path('/usr/local/sbin/hestia-professional-update')
 POLICY = Path('/usr/sbin/policy-rc.d')
