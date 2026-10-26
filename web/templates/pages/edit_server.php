@@ -1495,6 +1495,12 @@
 						</select>
 					</div>
 					<div class="u-mb10">
+						<?php if (is_file(dirname(__DIR__, 2) . '/professional/editor.php')) { ?>
+						<label class="form-label">Gerenciador de arquivos por domínio</label>
+						<p>Abra o gerenciador para navegar, enviar, baixar, renomear e editar arquivos. Alterações exigem senha e A2F.</p>
+						<p><a class="button button-secondary" href="/professional/editor.php"><i class="fas fa-folder-open icon-blue"></i>Abrir gerenciador de arquivos</a></p>
+						<p>O gerenciador legado permanece desativado por segurança. Esta ferramenta não depende do Terminal Web.</p>
+						<?php } else { ?>
 						<label for="v_filemanager" class="form-label">
 							<?= tohtml( _("File Manager")) ?>
 						</label>
@@ -1506,6 +1512,7 @@
 								<?= tohtml( _("Yes")) ?>
 							</option>
 						</select>
+						<?php } ?>
 					</div>
 					<div class="u-mb10">
 						<label for="v_web_terminal" class="form-label">

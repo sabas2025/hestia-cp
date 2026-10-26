@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0,'/usr/local/hestia/professional')
 from ops import require_root
-from business import account, record, pool_spec, regular, MARKER
+from business import account, record, pool_spec, regular, prepare_cache_parent, MARKER
 from apply import atomic_file
 
 def install(root, fs, owner, name):
@@ -12,6 +12,7 @@ def install(root, fs, owner, name):
     item = pool_spec(fs,owner,name); old = regular(item['path'])
     if old is not None and not old.startswith((MARKER+'\n').encode()):
         raise ValueError('Unmanaged cache pool')
+    prepare_cache_parent(fs, owner)
     atomic_file(Path(item['path']),item['body'].encode(),item['mode'])
 
 if __name__ == '__main__':

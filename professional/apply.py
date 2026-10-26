@@ -146,6 +146,7 @@ def source_files(source):
     files = [p for p in (source / "web/professional").glob("*") if p.is_file()]
     files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
     files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-professional-editor', 'v-professional-platform', 'v-backup-user', 'v-add-sys-web-terminal', 'v-start-service', 'v-stop-service', 'v-restart-service')]
+    files += [source / 'web/templates/pages/edit_server.php']
     files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php', 'web/templates/pages/edit_web.php')]
     files += [source / "web/css/themes/custom/professional.css"]
     files += [source / 'professional/mfa-logrotate.conf']
@@ -230,7 +231,12 @@ def apply_files(root, source, refresh=False, quarantine_filemanager=False):
     text = panel.read_text()
     if link not in text:
         # Add a link without replacing upstream HTML, authorization or scripts.
-        atomic_file(panel, (link + text).encode())
+        text = link + text
+    files_link = '<a class="pro-files-link" href="/professional/editor.php">Gerenciador de arquivos por domínio</a>\n'
+    if files_link not in text:
+        text = text.replace(link, link + files_link, 1)
+    atomic_file(panel, text.encode())
+    manifest.append({'file': 'web/templates/includes/panel.php', 'sha256': hashlib.sha256(panel.read_bytes()).hexdigest(), 'mode': panel.stat().st_mode & 0o777})
     for relative in ('bin/v-add-sys-filemanager', 'bin/v-add-user-composer', 'bin/v-add-sys-roundcube'):
         manifest.append({'file': relative, 'sha256': hashlib.sha256((root / relative).read_bytes()).hexdigest(), 'mode': (root / relative).stat().st_mode & 0o777})
     policy = json.loads((source / 'professional/component-policy.json').read_text())

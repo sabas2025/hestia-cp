@@ -66,7 +66,7 @@ class UpgradeTests(unittest.TestCase):
 
     def test_new_native_service_targets_are_backed_up_and_restored_from_old_manifest(self):
         from mfa import root_json
-        names={'bin/v-start-service','bin/v-stop-service','bin/v-restart-service'}
+        names={'bin/v-start-service','bin/v-stop-service','bin/v-restart-service','web/templates/pages/edit_server.php','web/templates/includes/panel.php'}
         manifest=self.root/'professional/deployment.json';old=json.loads(manifest.read_text())
         old['overlay']='1.4.0';old['files']=[item for item in old['files'] if item['file'] not in names]
         root_json(manifest,old)

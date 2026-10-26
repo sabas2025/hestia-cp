@@ -101,6 +101,32 @@ def pool_spec(fs, owner, name):
             'mode': 0o644, 'body': MARKER + '\n# ' + owner + '/' + name + '\n' +
             f'proxy_cache_path /var/cache/nginx/hestia-pro/{owner}/{name} levels=1:2 use_temp_path=off keys_zone=hpro_{name}:1m inactive=10m max_size=64m;\n'}
 
+def prepare_cache_parent(fs, owner):
+    """Create root-controlled parents before nginx creates its worker-owned leaf.
+
+    Descriptor traversal rejects links and account-writable parents. Existing
+    directories and cache contents are never chmodded, chowned or deleted.
+    """
+    username(owner)
+    base = Path(fs).absolute()
+    target = base/'var/cache/nginx/hestia-pro'/owner
+    fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in target.parts[1:]:
+            created = False
+            try:
+                os.mkdir(part, 0o755, dir_fd=fd); created = True
+            except FileExistsError: pass
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd); fd = child
+            info = os.fstat(fd)
+            # Root's sticky temporary ancestor is permitted for isolated tests.
+            if info.st_uid != 0 or (info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+                raise ValueError('Cache parent must be root controlled')
+            if created: os.fchmod(fd, 0o755)  # Administrative jobs use UMask=0077.
+        return target
+    finally: os.close(fd)
+
 def build(root, fs, action, owner, params, actor=None):
     if action in {'protection-profile','docker-operation','project-operation','cloud-operation','native-backup'}:
         if actor is None:raise ValueError('Administrative actor required')
@@ -262,6 +288,8 @@ def execute(root, fs, actor, ident, rollback=False, runner=run, now=None):
             plan['state'] = 'applying'; save(root,plan)
             event(folder(root),actor,plan['action'],'requested')
             try:
+                if plan['action'] == 'cache-profile' and plan['params']['value'] == 'professional-safe':
+                    prepare_cache_parent(fs, plan['owner'])
                 for item in plan['spec']['files']:
                     path = Path(item['path'])
                     if item['body'] is None:

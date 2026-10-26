@@ -25,6 +25,7 @@ UNITS = ['hestia-professional-health.service','hestia-professional-health.timer'
          'hestia-professional-backup@.service','hestia-professional-backup@.timer',
          'hestia-professional-cloud-backup@.service','hestia-professional-cloud-backup@.timer']
 EXTRA = ['professional/deployment.json','data/professional/deployment-status.json','web/templates/pages/edit_web.php','bin/v-add-sys-web-terminal',
+         'web/templates/pages/edit_server.php',
          'bin/v-start-service','bin/v-stop-service','bin/v-restart-service',
          'data/professional/health.json','professional/hst-common.sh','professional/bundle/install/assets.lock.tsv',
          'data/api/professional-readonly','web/templates/includes/panel.php',
@@ -93,7 +94,8 @@ def syntax(source, root, runner=command):
     for path in (source/'professional').glob('*.py'):compile(path.read_bytes(),str(path),'exec')
     php=root/'php/bin/php'
     if not php.is_file():raise ValueError('Native panel PHP unavailable')
-    for path in (source/'web/professional').glob('*.php'):runner([str(php),'-n','-l',str(path)])
+    php_files = [*(source/'web/professional').glob('*.php'), source/'web/templates/pages/edit_server.php']
+    for path in php_files:runner([str(php),'-n','-l',str(path)])
     for name in ('v-professional-editor','v-professional-platform','v-professional-business','v-professional-mfa','v-start-service','v-stop-service','v-restart-service'):
         runner(['/bin/bash','-n',str(source/'bin'/name)])
 
