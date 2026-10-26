@@ -47,3 +47,11 @@ class ToolControllerTests(controller.ControllerTests):
 
 class PlatformControllerTests(ToolControllerTests):
     tool='platform'
+
+class FileManagerBoundaryTests(ToolControllerTests):
+    def test_new_operations_reject_bad_csrf_readonly_and_foreign_scope(self):
+        for op in ('files','download','rename','mkdir','upload-begin','upload-part','upload-commit','upload-cancel'):
+            for token in ('','wrong',[]):
+                with self.subTest(op=op,token=token):self.assertEqual(self.call('POST',{'token':token,'op':op,'request':'{}'})[0],403)
+            self.assertEqual(self.call('POST',{'token':'TOKEN','op':op,'request':'{}'},readonly=True)[0],403)
+            self.assertEqual(self.call('POST',{'token':'TOKEN','op':op,'request':'{"owner":"clienttwo"}'},changes={'ROLE':'user','userContext':'user'})[0],400)

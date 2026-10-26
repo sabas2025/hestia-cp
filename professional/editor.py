@@ -171,18 +171,21 @@ def history(root, actor, owner):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__);parser.add_argument('--actor',required=True)
-    parser.add_argument('--op',choices=('domains','list','read','save','restore','history'),required=True)
+    parser.add_argument('--op',choices=('domains','list','read','save','restore','history','files','download','rename','mkdir','upload-begin','upload-part','upload-commit','upload-cancel'),required=True)
     args = parser.parse_args();require_root();root = Path('/usr/local/hestia')
     raw = sys.stdin.read(2097153)
     if len(raw)>2097152:raise ValueError('Oversized request')
     request = json.loads(raw)
-    if not isinstance(request,dict) or set(request)-{'owner','domain','path','content','sha256','revision','password','code'}:raise ValueError('Invalid request')
+    if not isinstance(request,dict) or set(request)-{'owner','domain','path','content','sha256','revision','password','code','offset','etag','name','total','upload','data'}:raise ValueError('Invalid request')
     owner = request.get('owner',args.actor);authorize(root,args.actor,owner)
-    if args.op in ('save','restore'):
+    import filemanager as fm
+    if not fm.enabled(root):raise ValueError('File manager disabled by administrator')
+    if args.op in ('save','restore','rename','mkdir','upload-begin','upload-part','upload-commit'):
         if not account(root,args.actor).get('TWOFA'):raise ValueError('Enable A2F first')
         from apply import verify_deployment
         if verify_deployment(root)['state']!='verified':raise ValueError('Deployment review required')
-        reauthenticate(root,args.actor,'reauth',{'password':request.get('password',''),'code':request.get('code','')})
+        if args.op not in ('upload-part','upload-commit'):
+            reauthenticate(root,args.actor,'reauth',{'password':request.get('password',''),'code':request.get('code','')})
     if args.op=='domains':
         text = regular(root/'data/users'/owner/'web.conf') or b''
         names = re.findall(r"(?:^|\n)DOMAIN='([^'\r\n]+)'",text.decode())
@@ -195,7 +198,17 @@ def main():
     elif args.op=='read':result = read(root,args.actor,owner,request['domain'],request['path'])
     elif args.op=='save':result = save(root,args.actor,owner,request['domain'],request['path'],request['content'],request['sha256'])
     elif args.op=='restore':result = restore(root,args.actor,request['revision'])
-    else:result = history(root,args.actor,owner)
+    elif args.op=='history':result = history(root,args.actor,owner)
+    else:
+        common=(root,args.actor,owner,request.get('domain',''),request.get('path',''))
+        if args.op=='files':result=fm.listing(*common,offset=request.get('offset',0))
+        elif args.op=='download':result=fm.download(*common,etag=request.get('etag'),offset=request.get('offset',0))
+        elif args.op=='rename':result=fm.rename(*common,new_name=request.get('name'),etag=request.get('etag'))
+        elif args.op=='mkdir':result=fm.mkdir(*common)
+        elif args.op=='upload-begin':result=fm.begin(*common,total=request.get('total'),sha256=request.get('sha256'))
+        elif args.op=='upload-part':result=fm.part(root,args.actor,request.get('upload'),request.get('offset'),request.get('data'))
+        elif args.op=='upload-commit':result=fm.commit(root,args.actor,request.get('upload'))
+        else:result=fm.cancel(root,args.actor,request.get('upload'))
     print(json.dumps(result,ensure_ascii=False))
 
 if __name__=='__main__':

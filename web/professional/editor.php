@@ -19,7 +19,9 @@ if ($method==='POST') {
         $request=json_decode($raw,true,32,JSON_THROW_ON_ERROR);
         if (!$identity['admin'] && isset($request['owner']) && $request['owner']!==$identity['owner']) { throw new RuntimeException(); }
         echo json_encode(pro_tools_call('editor',$identity['owner'],$op,$request),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_THROW_ON_ERROR);
-    } catch (Throwable $e) { http_response_code(400);echo '{"error":"Operação recusada. Confira proprietário, caminho, alteração concorrente, sintaxe e A2F. Recarregue o arquivo antes de tentar novamente."}'; }
+    } catch (Throwable $e) { http_response_code(400);echo '{"error":"Operação recusada. Confira se o recurso está ativado, proprietário, caminho, limite, alteração concorrente, sintaxe e A2F. Recarregue a pasta antes de tentar novamente."}'; }
     unset($raw,$request,$_POST['request']);exit;
 }
+$initialDomain=$_GET['domain']??'';
+if (!is_string($initialDomain) || !preg_match('/\A[a-zA-Z0-9.-]{1,253}\z/D',$initialDomain)) { $initialDomain=''; }
 define('HST_PRO_EDITOR_VIEW',true);include __DIR__.'/editor-view.php';

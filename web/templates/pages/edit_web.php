@@ -2,6 +2,11 @@
 <div class="toolbar">
 	<div class="toolbar-inner">
 		<div class="toolbar-buttons">
+			<?php if (empty($_SESSION['look']) && is_file('/usr/local/hestia/web/professional/editor.php')) { ?>
+				<a href="/professional/editor.php?<?= tohtml(http_build_query(['domain' => trim($v_domain, "'")])) ?>" class="button button-secondary">
+					<i class="fas fa-folder-open icon-blue"></i>Gerenciador de arquivos
+				</a>
+			<?php } ?>
 			<a class="button button-secondary button-back js-button-back" href="/list/web/">
 				<i class="fas fa-arrow-left icon-blue"></i><?= tohtml( _("Back")) ?>
 			</a>

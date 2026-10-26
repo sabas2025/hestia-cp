@@ -82,6 +82,12 @@ return ['state'=>'fixture-only']; }
     def test_authenticated_page_security_headers(self):
         status,headers,body=self.request(headers=self.user())
         self.assertEqual(status,200);self.assertIn('Visão geral',body);self.assertIn('no-store',headers['Cache-Control']);self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
+    def test_file_manager_domain_prefill_is_inert_and_escaped(self):
+        status,_,body=self.request('/professional/editor.php?domain=example.com',self.user())
+        self.assertEqual(status,200);self.assertIn('data-domain="example.com"',body)
+        for query in ('domain=%22%3E%3Cscript%3Ealert(1)%3C/script%3E','domain[]=example.com'):
+            status,_,body=self.request('/professional/editor.php?'+query,self.user())
+            self.assertEqual(status,200);self.assertIn('data-domain=""',body);self.assertNotIn('<script>alert(1)',body)
     def test_native_csrf_guard_still_rejects_missing_and_foreign_referer(self):
         for referer,expected in ((None,400),('https://foreign.invalid/',400),(self.base+'/professional/',200)):
             with self.subTest(referer=referer):

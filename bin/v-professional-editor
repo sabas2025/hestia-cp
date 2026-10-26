@@ -2,5 +2,5 @@
 # info: scoped editor; bounded JSON stdin, fixed root entrypoint
 set -eu
 [[ $EUID == 0 && $# == 2 && $1 =~ ^[a-z][a-z0-9_]{1,29}$ ]] || exit 1
-case "$2" in domains|list|read|save|restore|history) ;; *) exit 1 ;; esac
+case "$2" in domains|list|read|save|restore|history|files|download|rename|mkdir|upload-begin|upload-part|upload-commit|upload-cancel) ;; *) exit 1 ;; esac
 exec /usr/bin/python3 -I /usr/local/hestia/professional/editor_entry.py --actor "$1" --op "$2"

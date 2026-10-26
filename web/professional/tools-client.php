@@ -2,7 +2,7 @@
 declare(strict_types=1);
 if (!defined('HST_PRO_TOOLS')) { http_response_code(403); exit; }
 function pro_tools_call(string $tool, string $actor, string $op, array $request): array {
-    $allowed = ['editor'=>['domains','list','read','save','restore','history'], 'platform'=>['summary','docker','projects','backups','jobs']];
+    $allowed = ['editor'=>['domains','list','read','save','restore','history','files','download','rename','mkdir','upload-begin','upload-part','upload-commit','upload-cancel'], 'platform'=>['summary','docker','projects','backups','jobs']];
     if (!isset($allowed[$tool]) || !in_array($op,$allowed[$tool],true) || !preg_match('/\A[a-z][a-z0-9_]{1,29}\z/D',$actor)) { throw new RuntimeException('Invalid tool'); }
     $encoded = json_encode((object)$request,JSON_THROW_ON_ERROR);
     if (strlen($encoded)>2097152) { throw new RuntimeException('Request too large'); }
