@@ -25,6 +25,20 @@ class HttpTests(unittest.TestCase):
         cls.temporary=tempfile.TemporaryDirectory();cls.root=Path(cls.temporary.name)
         shutil.copytree(ROOT/'web/professional',cls.root/'web/professional')
         (cls.root/'web/inc').mkdir()
+        shutil.copyfile(ROOT/'web/inc/prevent_csrf.php',cls.root/'web/inc/prevent_csrf.php')
+        # Exercise the native guard unchanged. Only the session/config bootstrap is
+        # synthetic; this endpoint performs no administrative action.
+        (cls.root/'web/csrf-probe.php').write_text('''<?php
+$_SESSION=['POLICY_CSRF_STRICTNESS'=>1];
+$_SERVER['DOCUMENT_URI']='/add/webapp/index.php';
+require __DIR__.'/inc/prevent_csrf.php';
+header('Content-Type: application/json');
+echo json_encode(['state'=>'accepted','referer'=>$_SERVER['HTTP_REFERER']??'','origin'=>$_SERVER['HTTP_ORIGIN']??'']);
+''')
+        (cls.root/'web/external-target.php').write_text('''<?php
+header('Content-Type: application/json');
+echo json_encode(['referer'=>$_SERVER['HTTP_REFERER']??'']);
+''')
         shutil.copytree(ROOT/'web/inc/2fa',cls.root/'web/inc/2fa')
         shutil.copytree(ROOT/'web/reset2fa',cls.root/'web/reset2fa')
         (cls.root/'web/inc/main.php').write_text('''<?php
@@ -68,6 +82,21 @@ return ['state'=>'fixture-only']; }
     def test_authenticated_page_security_headers(self):
         status,headers,body=self.request(headers=self.user())
         self.assertEqual(status,200);self.assertIn('Visão geral',body);self.assertIn('no-store',headers['Cache-Control']);self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
+    def test_native_csrf_guard_still_rejects_missing_and_foreign_referer(self):
+        for referer,expected in ((None,400),('https://foreign.invalid/',400),(self.base+'/professional/',200)):
+            with self.subTest(referer=referer):
+                status,_,body=self.request('/csrf-probe.php',{'Referer':referer} if referer else {})
+                self.assertEqual(status,expected)
+                if expected==400:self.assertIn('Potential CSRF use detected',body)
+                else:self.assertEqual(json.loads(body)['state'],'accepted')
+        self.assertEqual(self.request('/csrf-probe.php',{'Origin':'https://foreign.invalid'},'POST',{})[0],400)
+    @unittest.skipUnless(shutil.which('node') and os.environ.get('PLAYWRIGHT_MODULE') and os.environ.get('CHROME_BIN'),
+                         'Node, PLAYWRIGHT_MODULE and CHROME_BIN required for real browser CSRF navigation')
+    def test_browser_navigation_preserves_native_csrf_and_external_privacy(self):
+        completed=subprocess.run([shutil.which('node'),str(ROOT/'professional/tests/test_csrf_navigation.cjs'),self.base],
+                                 capture_output=True,text=True,timeout=60)
+        self.assertEqual(completed.returncode,0,completed.stdout+completed.stderr)
+        self.assertEqual(json.loads(completed.stdout)['pages'],5)
     def test_query_cannot_change_user_scope(self):
         status,headers,body=self.request('/professional/?format=json&user=admin',self.user())
         self.assertEqual(status,200);data=json.loads(body);self.assertEqual(data['identity']['owner'],'clientone');self.assertIsNone(data['health']);self.assertNotIn('SERVER_ONLY',body)

@@ -3,7 +3,7 @@ declare(strict_types=1);
 $TAB='PROFESSIONAL';include $_SERVER['DOCUMENT_ROOT'].'/inc/main.php';require_once __DIR__.'/model.php';
 define('HST_PRO_TOOLS',true);require_once __DIR__.'/tools-client.php';
 define('HST_PRO_BUSINESS',true);require_once __DIR__.'/business-client.php';
-header('Cache-Control: no-store, private');header('Referrer-Policy: no-referrer');header('X-Content-Type-Options: nosniff');
+header('Cache-Control: no-store, private');header('Referrer-Policy: same-origin');header('X-Content-Type-Options: nosniff');
 header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
 try {
     $identity=pro_identity($_SESSION,$user_data??[]);
