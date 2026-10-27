@@ -7,11 +7,16 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import types
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'professional'))
 import business
 import cloud_setup as cloud
 import maintenance
+import control_plane
+import health
+import projects
+import mfa
 from mfa import root_json
 
 class CloudRegistrationTests(unittest.TestCase):
@@ -65,6 +70,12 @@ class CloudRegistrationTests(unittest.TestCase):
         self.assertEqual(json.loads(self.config.read_text())['targets'][0],original)
         self.assertEqual(old_transport.read_bytes(),before)
         self.assertEqual(len(self.calls),1);self.assertIn('drivebackup:',self.calls[0]);self.assertNotIn('private:',self.calls[0])
+    def test_idle_accepts_completed_group_readable_native_job_but_rejects_running_job(self):
+        root=self.base/'hestia';job=root/'data/professional/jobs/clientone.json';job.parent.mkdir(parents=True)
+        job.write_text('{"state":"succeeded"}');job.chmod(0o640)
+        cloud.idle(root,lambda args:'')
+        job.write_text('{"state":"running"}')
+        with self.assertRaises(ValueError):cloud.idle(root,lambda args:'')
 
 class MaintenanceTests(unittest.TestCase):
     def setUp(self):
@@ -76,6 +87,7 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(maintenance.php_version(new)['october_21_fix'],'included-in-reported-binary')
             self.assertFalse(maintenance.php_version(new)['running_workers_verified'])
         self.assertEqual(maintenance.php_version('8.1.35')['october_21_fix'],'vendor-backport-or-branch-review-required')
+        self.assertEqual(maintenance.php_version('8.4.27RC1')['october_21_fix'],'prerelease-review-required')
     def test_explicit_filemanager_enable_preserves_integrity_and_a2f_checks(self):
         policy=self.root/'data/professional-filemanager/policy.json';root_json(policy,{'schema':1,'enabled':False})
         with patch.object(maintenance,'verify_deployment',return_value={'state':'verified'}):
@@ -96,6 +108,63 @@ class MaintenanceTests(unittest.TestCase):
         with patch.object(maintenance,'verify_deployment',return_value={'state':'verified'}),self.assertRaises(ValueError):
             maintenance.repair(self.root,self.fs,start_nginx=True,runner=runner)
         self.assertEqual(calls,[['/usr/sbin/nginx','-t']])
+    def test_failed_repair_does_not_enable_filemanager_and_replaces_stale_success_receipt(self):
+        policy=self.root/'data/professional-filemanager/policy.json';root_json(policy,{'schema':1,'enabled':False})
+        receipt=self.root/'data/professional-maintenance/last-repair.json';root_json(receipt,{'state':'repaired-local'})
+        with patch.object(maintenance,'verify_deployment',return_value={'state':'verified'}),self.assertRaises(ValueError):
+            maintenance.repair(self.root,self.fs,enable_filemanager=True,start_nginx=True,runner=lambda args:(1,''))
+        self.assertFalse(json.loads(policy.read_text())['enabled'])
+        failed=json.loads(receipt.read_text());self.assertEqual(failed['state'],'failed-or-partial');self.assertEqual(failed['phase'],'nginx-validation')
+    def test_audit_skips_privileged_helpers_after_failed_integrity_and_marks_invalid_config(self):
+        path=self.fs/'etc/hestiacp/professional/cloud-backup.json';root_json(path,{'broken':True})
+        with patch.object(maintenance,'verify_deployment',return_value={'state':'review-required'}),patch.object(maintenance,'backend') as probe:
+            result=maintenance.audit(self.root,self.fs,runner=lambda args:(0,'active'))
+        probe.assert_not_called();self.assertIsNone(result['cloud']['configured']);self.assertEqual(result['cloud']['state'],'review-required')
+    def test_invalid_backend_response_is_not_success(self):
+        with patch.object(maintenance.subprocess,'run',return_value=types.SimpleNamespace(returncode=0,stdout='[]')):
+            result=maintenance.backend(self.root,'admin','clientone')
+        self.assertFalse(result['available']);self.assertEqual(result['state'],'invalid-response')
+
+class AuditBoundaryTests(unittest.TestCase):
+    def test_completed_initialization_cannot_mark_cloud_delivery_healthy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'conf').mkdir();(root/'conf/hestia.conf').write_text("VERSION='1.10.5'\n")
+            root_json(root/'data/professional/jobs/clientone.json',
+                      {'action':'init','state':'succeeded','updated_at':mfa.utcnow()})
+            result=health.collect(root,lambda args,timeout=0:(0,'active'))
+            check=next(c for c in result['checks'] if c['name']=='Backup criptografado / nuvem')
+            self.assertEqual(check['state'],'warning');self.assertFalse(result['backups']['cloud_delivery_tested'])
+            root_json(root/'data/professional/jobs/clientone.json',[])
+            result=health.collect(root,lambda args,timeout=0:(0,'active'))
+            self.assertEqual(result['backups']['professional']['stale'],1)
+    def test_account_schedule_refuses_a_target_instead_of_silently_ignoring_it(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);fs=root/'fs'
+            (root/'conf').mkdir();(root/'conf/hestia.conf').write_text("VERSION='1.10.5'\n")
+            for name,role in [('admin','admin'),('clientone','user')]:
+                path=root/'data/users'/name/'user.conf';path.parent.mkdir(parents=True)
+                path.write_text(f"ROLE='{role}'\nSUSPENDED='no'\n")
+            with patch('cloud_backup.settings',return_value={'targets':[{'id':'google'}],'append_only':False}):
+                with self.assertRaises(ValueError):
+                    control_plane.operation(root,fs,'admin','cloud-operation','clientone',{'operation':'enable-timer','target':'google'})
+                result=control_plane.operation(root,fs,'admin','cloud-operation','clientone',{'operation':'enable-timer','target':''})
+            self.assertEqual(result['command'][-1],'hestia-professional-cloud-backup@clientone.timer')
+            self.assertTrue(any('todos os destinos' in n for n in result['notes']))
+    def test_project_links_cannot_publish_query_tokens(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'projects.json'
+            root_json(path,{'projects':{'editor':{'type':'editor','owner':'clientone','url':'https://example.invalid/?token=SYNTHETIC'}}})
+            with self.assertRaises(ValueError):projects.settings(path)
+            root_json(path,{'projects':{'editor':{'type':'editor','owner':'clientone','url':'https://example.invalid/editor/'}}})
+            self.assertIn('editor',projects.settings(path)['projects'])
+    def test_mfa_refuses_configuration_writable_by_other_accounts_before_authentication(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);account=root/'data/users/clientone/user.conf';account.parent.mkdir(parents=True)
+            account.write_text("SUSPENDED='no'\n");account.chmod(0o666)
+            (root/'conf').mkdir();(root/'conf/hestia.conf').write_text("DEMO_MODE='no'\n")
+            verifier=__import__('unittest.mock',fromlist=['Mock']).Mock()
+            with self.assertRaises(ValueError):mfa.operate(root,'clientone','prepare',{},verifier=verifier)
+            verifier.assert_not_called();self.assertFalse((root/'data/professional-mfa').exists())
 
 class NativeFilemanagerUITests(unittest.TestCase):
     def render(self,professional):

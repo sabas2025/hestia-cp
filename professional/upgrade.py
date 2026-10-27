@@ -25,6 +25,7 @@ UNITS = ['hestia-professional-health.service','hestia-professional-health.timer'
          'hestia-professional-backup@.service','hestia-professional-backup@.timer',
          'hestia-professional-cloud-backup@.service','hestia-professional-cloud-backup@.timer']
 EXTRA = ['professional/deployment.json','data/professional/deployment-status.json','web/templates/pages/edit_web.php','bin/v-add-sys-web-terminal',
+         'web-terminal/server.js','web-terminal/web-terminal-session-auth.php',
          'web/templates/pages/edit_server.php',
          'bin/v-start-service','bin/v-stop-service','bin/v-restart-service',
          'data/professional/health.json','professional/hst-common.sh','professional/bundle/install/assets.lock.tsv',
@@ -51,6 +52,8 @@ def preflight(root, source, fs=Path('/')):
     if config(root/'conf/hestia.conf').get('VERSION')!='1.10.5':raise ValueError('Review this Hestia version first')
     if overlay.verify_deployment(root)['state']!='verified':raise ValueError('Installed layer differs from its saved manifest')
     old=json.loads(private_read(root/'professional/deployment.json',4194304))
+    from terminal_guard import inspect as inspect_terminal
+    inspect_terminal(root,source)
     known={root/item['file'] for item in old['files']}
     allowed={root/name for name in EXTRA}|{fs/name for name in SYSTEM_FILES}|{fs/'etc/systemd/system'/name for name in UNITS}
     for path in targets(root,source,fs):
@@ -94,7 +97,7 @@ def syntax(source, root, runner=command):
     for path in (source/'professional').glob('*.py'):compile(path.read_bytes(),str(path),'exec')
     php=root/'php/bin/php'
     if not php.is_file():raise ValueError('Native panel PHP unavailable')
-    php_files = [*(source/'web/professional').glob('*.php'), source/'web/templates/pages/edit_server.php']
+    php_files = [*(source/'web/professional').glob('*.php'), source/'web/templates/pages/edit_server.php', source/'professional/terminal-auth.php']
     for path in php_files:runner([str(php),'-n','-l',str(path)])
     for name in ('v-professional-editor','v-professional-platform','v-professional-business','v-professional-mfa','v-start-service','v-stop-service','v-restart-service'):
         runner(['/bin/bash','-n',str(source/'bin'/name)])
@@ -110,9 +113,16 @@ def run_upgrade(root,source,fs=Path('/'),runner=command,integrate=None,check=Non
         except RuntimeError:timer_enabled=False
         record={**plan,'state':'applying','backup':str(backup),'started':time.time()};root_json(backup/'status.json',record)
         try:
-            overlay.apply_files(root,source)
+            applied=overlay.apply_files(root,source)
             (integrate or overlay.enable_services)(root)
             if overlay.verify_deployment(root)['state']!='verified':raise ValueError('Post-update manifest mismatch')
+            terminal_active=False
+            if applied.get('terminal_changed'):
+                try:runner(['/usr/bin/systemctl','is-active','hestia-web-terminal']);terminal_active=True
+                except RuntimeError:pass
+                if terminal_active:
+                    runner(['/usr/bin/systemctl','restart','hestia-web-terminal'])
+                    runner(['/usr/bin/systemctl','is-active','hestia-web-terminal'])
             runner(['/usr/bin/systemctl','is-active','hestia'])
             runner(['nginx','-t']);runner(['apache2ctl','configtest'])
             if check:check(root)
@@ -124,6 +134,8 @@ def run_upgrade(root,source,fs=Path('/'),runner=command,integrate=None,check=Non
             try:
                 if not timer_enabled:runner(['/usr/bin/systemctl','disable','--now','hestia-professional-health.timer'])
                 restore(files);runner(['/usr/bin/systemctl','daemon-reload'])
+                if locals().get('terminal_active'):
+                    runner(['/usr/bin/systemctl','restart','hestia-web-terminal'])
                 if overlay.verify_deployment(root)['state']!='verified':raise ValueError('Rollback manifest mismatch')
                 record['state']='failed-restored'
             finally:root_json(backup/'status.json',record)

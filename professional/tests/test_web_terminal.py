@@ -12,6 +12,8 @@ class WebTerminalTests(unittest.TestCase):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)
         self.root=self.base/'hestia';self.bin=self.base/'bin';self.bin.mkdir();(self.root/'func').mkdir(parents=True);(self.root/'conf').mkdir()
         (self.root/'web-terminal').mkdir();(self.root/'web-terminal/server.js').write_text('// fixture')
+        (self.root/'professional').mkdir()
+        (self.root/'professional/terminal_guard.py').write_text('import os\nraise SystemExit(1 if os.environ.get("QA_FAIL")=="hardening" else 0)\n')
         self.trace=self.base/'trace';self.trace.write_text('')
         (self.root/'func/main.sh').write_text('source_conf() { :; }; check_hestia_demo_mode() { :; }; log_event() { :; }; OK=0; ARGUMENTS=""\n')
         self.bootstrap=self.base/'bootstrap';self.bootstrap.write_text(f'HESTIA={self.root}\nBIN={self.bin}\nWEB_TERMINAL=false\n')
@@ -38,7 +40,7 @@ exit 0
         r=self.run_script();self.assertEqual(r.returncode,0,r.stderr)
         lines=self.trace.read_text().splitlines();self.assertEqual(lines[:4],['systemctl start hestia-web-terminal','systemctl enable hestia-web-terminal','systemctl is-active --quiet hestia-web-terminal','v-change-sys-config-value WEB_TERMINAL true'])
     def test_start_enable_status_and_package_failures_never_set_enabled(self):
-        for failure in ('start','enable','is-active','package'):
+        for failure in ('start','enable','is-active','package','hardening'):
             with self.subTest(failure=failure):
                 self.trace.write_text('')
                 p=self.root/'web-terminal/server.js'

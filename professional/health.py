@@ -113,6 +113,7 @@ def collect(root=Path("/usr/local/hestia"), runner=command):
         if path.is_symlink() or path.stat().st_size > 1048576: continue
         try:
             job = json.loads(path.read_text())
+            if not isinstance(job, dict): raise ValueError('Invalid job metadata')
             job_count += 1
             failed += job.get('state') == 'failed'
             stamp = datetime.fromisoformat(job.get('updated_at', '')).timestamp()
@@ -123,8 +124,10 @@ def collect(root=Path("/usr/local/hestia"), runner=command):
                        'cloud_delivery_tested': False}
     check('Backup nativo local', 'warning' if not native['catalogued'] or native['local_missing'] else 'ok',
           f"{native['catalogued']} cópias catalogadas; {native['local_present']} arquivos locais presentes; {native['local_missing']} ausentes. Restauração não comprovada.")
-    check('Backup criptografado / nuvem', 'warning' if failed or stale_jobs or not job_count else 'ok',
-          f'{failed} falhas e {stale_jobs} tarefas sem atualização; confira destinos e última execução' if job_count else
+    # An init/check/job counter cannot prove delivery, current destination coverage
+    # or recovery. Keep the inspection conservative until those are verified.
+    check('Backup criptografado / nuvem', 'warning',
+          f'{job_count} tarefas registradas; {failed} falhas e {stale_jobs} tarefas sem atualização. Entrega e recuperação em nuvem não comprovadas por esta inspeção.' if job_count else
           'Nenhuma execução dos fluxos Professional registrada. Este aviso não invalida o backup nativo local.')
     data["status"] = "critical" if any(c["state"] == "critical" for c in data["checks"]) else "warning" if any(c["state"] == "warning" for c in data["checks"]) else "ok"
     return data

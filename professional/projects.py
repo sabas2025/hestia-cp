@@ -72,8 +72,8 @@ def settings(path):
         if project.get('domain'): project['domain'] = domain(project['domain'])
         if project.get('url'):
             parsed = urlsplit(project['url'])
-            if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
-                raise ValueError('Project links require HTTPS without embedded credentials')
+            if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or parsed.fragment or parsed.query:
+                raise ValueError('Project links require HTTPS without credentials, query strings or fragments')
         if project.get('type') in ('proxy', 'node'):
             if type(project.get('port')) is not int or not 1024 <= project['port'] <= 65535:
                 raise ValueError('Use a dedicated unprivileged loopback application port')

@@ -1,5 +1,6 @@
 """Existing installation updates and prerequisite failure recovery, using isolated fixtures."""
 import json
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -12,6 +13,7 @@ ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'professiona
 import apply as overlay
 import dependencies as deps
 import upgrade
+import terminal_guard
 
 class UpgradeTests(unittest.TestCase):
     def setUp(self):
@@ -77,6 +79,20 @@ class UpgradeTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):upgrade.run_upgrade(self.root,self.source,self.fs,self.runner,fail,lambda r:None)
         for name in names:self.assertEqual((self.root/name).read_text(),'#!/bin/bash\n# original native fixture\n')
         self.assertEqual(json.loads(manifest.read_text())['overlay'],'1.4.0')
+
+    def test_terminal_pair_and_running_service_are_restored_after_later_upgrade_failure(self):
+        folder=self.root/'web-terminal';folder.mkdir();originals={};mapping={}
+        for name,(asset,_,mode) in terminal_guard.FILES.items():
+            value=('synthetic original '+name).encode();originals[name]=value
+            (folder/name).write_bytes(value);(folder/name).chmod(mode)
+            mapping[name]=(asset,hashlib.sha256(value).hexdigest(),mode)
+        manifest=(self.root/'professional/deployment.json').read_bytes()
+        def fail(root):raise RuntimeError('synthetic health failure')
+        with patch.dict(terminal_guard.FILES,mapping),self.assertRaises(RuntimeError):
+            upgrade.run_upgrade(self.root,self.source,self.fs,self.runner,lambda root:None,fail)
+        for name,value in originals.items():self.assertEqual((folder/name).read_bytes(),value)
+        self.assertEqual((self.root/'professional/deployment.json').read_bytes(),manifest)
+        self.assertEqual(self.calls.count(['/usr/bin/systemctl','restart','hestia-web-terminal']),2)
 
 class DependencyTests(unittest.TestCase):
     def setUp(self):

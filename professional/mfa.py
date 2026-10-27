@@ -128,6 +128,9 @@ def codes(state, seed):
 def operate(root, user, action, request, verifier=password_ok, now=None, keystore=Path('/etc/hestiacp/professional/secrets')):
     username(user); now = time.time() if now is None else now
     account_path = root / 'data/users' / user / 'user.conf'
+    from business import regular
+    if regular(account_path) is None or regular(root / 'conf/hestia.conf') is None:
+        raise ValueError('Account configuration unavailable')
     account = config(account_path)
     if account.get('SUSPENDED') != 'no' or account.get('LOGIN_DISABLED') == 'yes': raise ValueError('Account unavailable')
     native = config(root / 'conf/hestia.conf')
@@ -135,6 +138,8 @@ def operate(root, user, action, request, verifier=password_ok, now=None, keystor
     folder = private_directory(root / 'data/professional-mfa', 0o700)
     state_path = folder / (user + '.json')
     with lock(folder / 'locks' / (user + '.lock')):
+        if regular(account_path) is None or regular(root / 'conf/hestia.conf') is None:
+            raise ValueError('Account configuration unavailable')
         account = config(account_path)
         if account.get('SUSPENDED') != 'no' or account.get('LOGIN_DISABLED') == 'yes': raise ValueError('Account unavailable')
         state = json.loads(private_read(state_path)) if state_path.exists() else {}

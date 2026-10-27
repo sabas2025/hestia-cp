@@ -147,6 +147,7 @@ def source_files(source):
     files += [source / 'web/inc/2fa' / name for name in ('local-provider.php', 'secret.php', 'check.php')]
     files += [source / 'bin' / name for name in ('v-add-user-2fa', 'v-check-user-2fa', 'v-professional-mfa', 'v-professional-business', 'v-professional-editor', 'v-professional-platform', 'v-backup-user', 'v-add-sys-web-terminal', 'v-start-service', 'v-stop-service', 'v-restart-service')]
     files += [source / 'web/templates/pages/edit_server.php']
+    files += [source / 'professional/terminal-runtime.js', source / 'professional/terminal-auth.php']
     files += [source / name for name in ('web/edit/user/index.php', 'web/templates/pages/edit_user.php', 'web/login/index.php', 'web/reset2fa/index.php', 'web/templates/pages/login/login_2.php', 'web/templates/pages/edit_web.php')]
     files += [source / "web/css/themes/custom/professional.css"]
     files += [source / 'professional/mfa-logrotate.conf']
@@ -226,6 +227,9 @@ def apply_files(root, source, refresh=False, quarantine_filemanager=False):
     atomic_file(root / "data/api/professional-readonly", profile.encode(), 0o640)
     patch_runtime(root, source)
     patch_dependency_commands(root)
+    from terminal_guard import protect
+    terminal = protect(root, source)
+    manifest += terminal['files']
     panel = root / "web/templates/includes/panel.php"
     link = '<a class="pro-home-link" href="/professional/">Central de hospedagem · Visão geral</a>\n'
     text = panel.read_text()
@@ -242,7 +246,7 @@ def apply_files(root, source, refresh=False, quarantine_filemanager=False):
     policy = json.loads((source / 'professional/component-policy.json').read_text())
     atomic_file(root / "professional/deployment.json", json.dumps({"overlay": policy['overlay_version'], "hestia": VERSION, "files": manifest}, indent=2).encode(), 0o600)
     atomic_json(root / 'data/professional/deployment-status.json', {'state': 'verified', 'mismatched': [], 'overlay': policy['overlay_version']})
-    return {"status": "applied", "version": VERSION, "files": len(manifest)}
+    return {"status": "applied", "version": VERSION, "files": len(manifest), 'terminal_changed': terminal['changed']}
 
 def enable_services(root):
     if root != Path("/usr/local/hestia"):

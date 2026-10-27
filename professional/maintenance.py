@@ -4,15 +4,14 @@
 No package upgrades, cloud transfers, WebDAV operations or account/password changes.
 """
 import argparse
+import configparser
 import json
-import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from ops import require_root, private_directory, lock, safe_environment, username
+from ops import require_root, private_directory, lock, safe_environment, username, utcnow
 from apply import verify_deployment
 from business import account, record, regular, prepare_cache_parent, pool_spec, MARKER
 from filemanager import enabled
@@ -31,7 +30,9 @@ def php_version(value):
     match=re.search(r'(?<![0-9])(\d+)\.(\d+)\.(\d+)',value)
     if not match:return {'version':'unknown','october_21_fix':'unverified'}
     version=tuple(map(int,match.groups()));branch='.'.join(map(str,version[:2]))
-    if branch in MINIMUM:
+    if re.search(r'(?:dev|alpha|beta|RC)', value, re.IGNORECASE):
+        state='prerelease-review-required'
+    elif branch in MINIMUM:
         state='included-in-reported-binary' if version>=MINIMUM[branch] else 'upgrade-required'
     else:state='vendor-backport-or-branch-review-required'
     return {'version':'.'.join(map(str,version)),'october_21_fix':state,
@@ -44,7 +45,11 @@ def backend(root,actor,owner,as_web=False):
     try:
         result=subprocess.run(args,input=json.dumps({'owner':owner}),text=True,capture_output=True,
                               timeout=20,env=safe_environment())
-        domains=json.loads(result.stdout).get('domains',[]) if result.returncode==0 else []
+        data=json.loads(result.stdout) if result.returncode==0 else {}
+        domains=data.get('domains') if isinstance(data,dict) else None
+        if result.returncode==0 and (not isinstance(domains,list) or any(not isinstance(d,str) for d in domains)):
+            return {'available':False,'exit':0,'state':'invalid-response'}
+        domains=domains or []
         return {'exit':result.returncode,'domain_count':len(domains),'available':result.returncode==0}
     except (OSError,ValueError,subprocess.TimeoutExpired):return {'available':False,'exit':127}
 
@@ -62,14 +67,21 @@ def audit(root=ROOT,fs=Path('/'),actor='sabasadmin',owner='sabas',runner=run):
     for service in ('nginx','hestia-web-terminal','fail2ban'):
         code,text=runner(['/usr/bin/systemctl','is-active',service])
         output[service]={'active':code==0 and text.strip()=='active'}
-    output['filemanager']['root_probe']=backend(root,actor,owner)
-    output['filemanager']['panel_permissions_probe']=backend(root,actor,owner,as_web=True)
+    verified=output.get('integrity',{}).get('state')=='verified'
+    if verified:
+        output['filemanager']['root_probe']=backend(root,actor,owner)
+        output['filemanager']['panel_permissions_probe']=backend(root,actor,owner,as_web=True)
+    else:
+        output['filemanager']['root_probe']={'available':False,'state':'not-run-unverified-deployment'}
+        output['filemanager']['panel_permissions_probe']={'available':False,'state':'not-run-unverified-deployment'}
     binaries=[root/'php/bin/php']
     for branch in ('8.0','8.1','8.2','8.3','8.4','8.5'):
-        path=shutil.which('php'+branch)
-        if path:binaries.append(Path(path))
+        binaries.append(fs/('usr/bin/php'+branch))
     for path in binaries:
-        if path.is_file():
+        if verified and path.is_file():
+            try: regular(path,67108864)
+            except (ValueError,OSError):
+                output['php'].append({'runtime':path.name,'version':'unknown','state':'unsafe-binary-not-executed'});continue
             code,text=runner([str(path),'-n','-r','echo PHP_VERSION;'])
             row=php_version(text if code==0 else '')
             row['runtime']='panel' if path==root/'php/bin/php' else path.name
@@ -80,41 +92,62 @@ def audit(root=ROOT,fs=Path('/'),actor='sabasadmin',owner='sabas',runner=run):
         targets=settings(cfg)['targets']
         output['cloud']={'configured':True,'targets':[{'id':t['id'],'provider':t['provider']} for t in targets],
                          'delivery_verified_by_this_audit':False}
-    except (ValueError,OSError,KeyError):output['cloud']={'configured':False,'delivery_verified_by_this_audit':False}
+    except (ValueError,OSError,KeyError,TypeError,configparser.Error):
+        exists=cfg.exists() or cfg.is_symlink()
+        output['cloud']={'configured':None if exists else False,
+                         'state':'review-required' if exists else 'not-configured',
+                         'delivery_verified_by_this_audit':False}
     output['package_updates_applied']=False
     output['status']='review-required'  # Runtime versions and availability are not acceptance tests.
     return output
 
 def repair(root=ROOT,fs=Path('/'),enable_filemanager=False,start_nginx=False,runner=run):
     if verify_deployment(root)['state']!='verified':raise ValueError('Deployment integrity requires review')
-    result={'state':'repaired-local','cache_parents':[],'nextcloud_or_webdav_modified':False,
-            'twofa_bypassed':False,'packages_upgraded':False}
+    result={'state':'running','phase':'preflight','cache_parents':[],'nextcloud_or_webdav_modified':False,
+            'twofa_bypassed':False,'packages_upgraded':False,'started_at':utcnow()}
     folder=private_directory(root/'data/professional-maintenance',0o700)
+    receipt=folder/'last-repair.json'
     with lock(folder/'repair.lock'):
-        for path in sorted((fs/'etc/nginx/conf.d').glob('hestia-pro-cache-*.conf')):
-            data=regular(path)
-            match=re.match(re.escape(MARKER)+r'\n# ([a-z][a-z0-9_]{1,29})/([A-Za-z0-9.-]+)\n',data.decode() if data else '')
-            if not match:raise ValueError('Unrecognized cache configuration')
-            owner,name=match.groups();account(root,owner,target=True);record(root,owner,'web',name)
-            spec=pool_spec(fs,owner,name)
-            if str(path)!=spec['path'] or data!=spec['body'].encode():raise ValueError('Modified cache configuration')
-            prepare_cache_parent(fs,owner);result['cache_parents'].append(owner)
-        if enable_filemanager:
-            previous=enabled(root)  # Refuse malformed policy instead of overwriting it.
-            policy=root/'data/professional-filemanager/policy.json'
-            if not previous:
-                root_json(folder/'filemanager-policy.before.json',{'schema':1,'enabled':False})
-                root_json(policy,{'schema':1,'enabled':True})
-            result['filemanager_enabled']=enabled(root)
-        if start_nginx:
-            if runner(['/usr/sbin/nginx','-t'])[0]!=0:raise ValueError('Nginx configuration test failed')
-            code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
-            if code!=0 or text.strip()!='active':
-                if runner(['/usr/bin/systemctl','start','nginx'])[0]!=0:raise RuntimeError('Nginx start failed')
-            code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
-            if code!=0 or text.strip()!='active':raise RuntimeError('Nginx is not active')
-            result['nginx_active']=True
-        root_json(folder/'last-repair.json',result)
+        root_json(receipt,result)
+        try:
+            pools=[]
+            for path in sorted((fs/'etc/nginx/conf.d').glob('hestia-pro-cache-*.conf')):
+                data=regular(path)
+                match=re.match(re.escape(MARKER)+r'\n# ([a-z][a-z0-9_]{1,29})/([A-Za-z0-9.-]+)\n',data.decode() if data else '')
+                if not match:raise ValueError('Unrecognized cache configuration')
+                owner,name=match.groups();account(root,owner,target=True);record(root,owner,'web',name)
+                spec=pool_spec(fs,owner,name)
+                if str(path)!=spec['path'] or data!=spec['body'].encode():raise ValueError('Modified cache configuration')
+                pools.append(owner)
+            previous=enabled(root) if enable_filemanager else None
+            result['phase']='cache-parents';root_json(receipt,result)
+            for owner in sorted(set(pools)):
+                prepare_cache_parent(fs,owner);result['cache_parents'].append(owner)
+            if start_nginx:
+                result['phase']='nginx-validation';root_json(receipt,result)
+                if runner(['/usr/sbin/nginx','-t'])[0]!=0:raise ValueError('Nginx configuration test failed')
+                code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
+                if code!=0 or text.strip()!='active':
+                    result['phase']='nginx-start';root_json(receipt,result)
+                    if runner(['/usr/bin/systemctl','start','nginx'])[0]!=0:raise RuntimeError('Nginx start failed')
+                    result['nginx_started']=True
+                code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
+                if code!=0 or text.strip()!='active':raise RuntimeError('Nginx is not active')
+                result['nginx_active']=True
+            if enable_filemanager:
+                result['phase']='filemanager-policy';root_json(receipt,result)
+                policy=root/'data/professional-filemanager/policy.json'
+                if not previous:
+                    root_json(folder/'filemanager-policy.before.json',{'schema':1,'enabled':False})
+                    root_json(policy,{'schema':1,'enabled':True})
+                result['filemanager_enabled']=enabled(root)
+            result.update(state='repaired-local',phase='completed',finished_at=utcnow())
+            root_json(receipt,result)
+        except BaseException as error:
+            result.update(state='failed-or-partial',error=type(error).__name__,finished_at=utcnow())
+            try:root_json(receipt,result)
+            except OSError:pass
+            raise
     return result
 
 def main():

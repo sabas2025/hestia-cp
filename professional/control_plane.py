@@ -104,6 +104,7 @@ def operation(root, fs, actor, action, owner, params, runner=read_command):
         if params['operation'] in ('init','drill','retention') and not target:raise ValueError('Choose one explicit destination')
         if params['operation']=='retention' and cfg.get('append_only'):raise ValueError('Append-only policy blocks retention')
         if params['operation'].endswith('-timer'):
+            if target:raise ValueError('Account scheduling uses all configured destinations; leave target empty')
             unit = 'hestia-professional-cloud-backup@'+owner+'.timer'
             result['command'] = ['/usr/bin/systemctl','enable' if params['operation']=='enable-timer' else 'disable','--now',unit]
         else:
@@ -111,6 +112,7 @@ def operation(root, fs, actor, action, owner, params, runner=read_command):
                                  '--config',str(path),'--user',owner,'--apply']
             if target:result['command'] += ['--target',target]
         result['notes'] = ['Executa o fluxo criptografado usando destinos e credenciais privados já cadastrados.',
+                           'O agendamento diário abrange todos os destinos cadastrados da conta; deixe o destino vazio para agendar.',
                            'Drill verifica a recuperação do arquivo; não importa SQL nem substitui teste de aplicação.',
                            'Retenção pode excluir snapshots conforme a configuração. A cópia nativa local permanece separada.']
     else:

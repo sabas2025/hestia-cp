@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from ops import private_read, private_directory, lock, require_root, safe_environment
 from mfa import root_json
 from cloud_backup import identifier, settings
+from business import regular
 
 PROVIDERS = ('google-drive', 'amazon-s3', 'private-s3', 'ftps', 'ftp', 'sftp')
 ROOT = Path('/usr/local/hestia')
@@ -33,7 +34,8 @@ def idle(root, runner):
                     'hestia-professional-cloud-backup@*.service','hestia-professional-backup@*.service'])
     if units.strip(): raise ValueError('Pause backup timers and wait for active backups before registration')
     for path in (root/'data/professional/jobs').glob('*.json'):
-        if json.loads(private_read(path)).get('state') in ('queued','running'):
+        # Job receipts are intentionally root-owned, group-readable metadata.
+        if json.loads(regular(path)).get('state') in ('queued','running'):
             raise ValueError('Wait for the active backup job')
 
 def configure(name, provider, remote, folder, transport, password, *, config=CONFIG,
