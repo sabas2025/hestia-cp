@@ -126,6 +126,68 @@ class MaintenanceTests(unittest.TestCase):
             result=maintenance.backend(self.root,'admin','clientone')
         self.assertFalse(result['available']);self.assertEqual(result['state'],'invalid-response')
 
+class PHPBinaryProbeTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)
+        self.binary=self.base/'php';self.binary.write_bytes(b'fixture');self.binary.chmod(0o755)
+    def sparse(self,size):
+        with self.binary.open('r+b') as stream:stream.truncate(size)
+    def test_real_php_with_padding_matching_vps_size_collects_version(self):
+        php=os.environ.get('PHP_BINARY') or shutil.which('php');self.assertTrue(php)
+        source=Path(php)
+        with source.open('rb') as stream:self.assertEqual(stream.read(4),b'\x7fELF')
+        self.assertLess(source.stat().st_size,72818096)
+        shutil.copyfile(source,self.binary);self.binary.chmod(0o755);self.sparse(72818096)
+        expected=subprocess.check_output([php,'-n','-r','echo PHP_VERSION;'],text=True,timeout=15).strip()
+        result=maintenance.probe_php(self.binary,'panel')
+        self.assertEqual(result['state'],'version-collected');self.assertEqual(result['version'],expected.split('-')[0])
+        self.assertEqual(result['binary_size_bytes'],72818096);self.assertTrue(result['binary_metadata_verified'])
+        self.assertFalse(result['package_integrity_verified']);self.assertFalse(result['running_workers_verified'])
+    def test_metadata_probe_never_reads_binary_and_normal_configuration_limits_remain(self):
+        self.sparse(72818096)
+        with patch.object(business.os,'fdopen',side_effect=AssertionError('Binary contents must not be read')):
+            result=maintenance.probe_php(self.binary,'panel',lambda args:(0,'8.4.27'))
+            self.assertEqual(result['state'],'version-collected')
+        with self.assertRaises(ValueError):business.regular(self.binary)
+        with self.assertRaises(ValueError):business.regular(self.binary,metadata_only=True)
+    def test_oversized_or_empty_binary_is_classified_without_execution(self):
+        for size in (0,maintenance.PHP_BINARY_LIMIT+1):
+            self.sparse(size)
+            def never(args):raise AssertionError('Size-rejected binary must not execute')
+            result=maintenance.probe_php(self.binary,'panel',never)
+            self.assertEqual(result['state'],'binary-size-review-required')
+            self.assertTrue(result['binary_metadata_verified']);self.assertFalse(result['version_probe_attempted'])
+    def test_links_writable_permissions_and_special_files_are_refused(self):
+        def never(args):raise AssertionError('Unsafe file must not execute')
+        self.binary.chmod(0o777)
+        self.assertEqual(maintenance.probe_php(self.binary,'panel',never)['state'],'binary-metadata-review-required')
+        self.binary.chmod(0o755);link=self.base/'alias';link.symlink_to(self.binary)
+        self.assertEqual(maintenance.probe_php(link,'panel',never)['state'],'binary-metadata-review-required')
+        hard=self.base/'hard';os.link(self.binary,hard)
+        self.assertEqual(maintenance.probe_php(self.binary,'panel',never)['state'],'binary-metadata-review-required')
+        fifo=self.base/'fifo';os.mkfifo(fifo)
+        self.assertEqual(maintenance.probe_php(fifo,'panel',never)['state'],'binary-metadata-review-required')
+    def test_nonexecutable_failed_or_unrecognized_output_cannot_claim_a_fixed_version(self):
+        self.binary.chmod(0o644)
+        def never(args):raise AssertionError('Nonexecutable file must not execute')
+        self.assertEqual(maintenance.probe_php(self.binary,'panel',never)['state'],'binary-not-executable')
+        self.binary.chmod(0o755)
+        for output,state in (((1,'8.4.27'),'binary-command-failed'),((0,'unknown'),'binary-version-unverified')):
+            result=maintenance.probe_php(self.binary,'panel',lambda args:output)
+            self.assertEqual(result['state'],state);self.assertEqual(result['version'],'unknown')
+    def test_audit_preserves_panel_label_for_size_rejection_and_skips_unverified_layers(self):
+        root=self.base/'hestia';path=root/'php/bin/php';path.parent.mkdir(parents=True)
+        path.write_bytes(b'x');path.chmod(0o755)
+        with path.open('r+b') as stream:stream.truncate(maintenance.PHP_BINARY_LIMIT+1)
+        calls=[]
+        with patch.object(maintenance,'verify_deployment',return_value={'state':'verified'}),patch.object(maintenance,'backend',return_value={'available':True}):
+            data=maintenance.audit(root,self.base/'fs',runner=lambda args:calls.append(args) or (0,'active'))
+        self.assertEqual(data['php'][0]['runtime'],'panel');self.assertEqual(data['php'][0]['state'],'binary-size-review-required')
+        self.assertFalse(any(args[0]==str(path) for args in calls))
+        with patch.object(maintenance,'verify_deployment',return_value={'state':'review-required'}),patch.object(maintenance,'probe_php') as probe:
+            maintenance.audit(root,self.base/'fs',runner=lambda args:(0,'active'))
+        probe.assert_not_called()
+
 class CacheMigrationTests(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)

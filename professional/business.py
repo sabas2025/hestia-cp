@@ -40,7 +40,8 @@ def run(args):
         raise RuntimeError('Native operation failed; inspect history')
     return output.decode('utf-8', errors='replace')
 
-def regular(path, limit=2097152):
+def regular(path, limit=2097152, *, metadata_only=False):
+    """Validate root-controlled files; metadata-only callers never read contents."""
     path = Path(path)
     if path.is_symlink() or any(p.is_symlink() for p in path.parents):
         raise ValueError('Linked configuration rejected')
@@ -57,6 +58,7 @@ def regular(path, limit=2097152):
         writable = st.st_mode & 0o002 or (st.st_mode & 0o020 and st.st_gid != 0)
         if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or writable or st.st_nlink != 1 or st.st_size > limit:
             raise ValueError('Configuration must be a bounded root-controlled regular file')
+        if metadata_only:return st
         with os.fdopen(fd,'rb',closefd=False) as stream: return stream.read(limit+1)
     finally: os.close(fd)
 

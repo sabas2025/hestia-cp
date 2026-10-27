@@ -22,6 +22,7 @@ from assistant import domain
 
 ROOT=Path('/usr/local/hestia')
 MINIMUM={'8.2':(8,2,35),'8.3':(8,3,36),'8.4':(8,4,27),'8.5':(8,5,12)}
+PHP_BINARY_LIMIT=268435456
 
 def run(args):
     try:
@@ -40,6 +41,28 @@ def php_version(value):
     else:state='vendor-backport-or-branch-review-required'
     return {'version':'.'.join(map(str,version)),'october_21_fix':state,
             'running_workers_verified':False,'session_upload_progress_verified':False}
+
+def probe_php(path,runtime,runner=run):
+    result={'runtime':runtime,'version':'unknown','version_probe_attempted':False,
+            'binary_metadata_verified':False,'package_integrity_verified':False,
+            'running_workers_verified':False,'session_upload_progress_verified':False}
+    try:
+        # Inspect metadata without reading an ELF into memory. Size is classified
+        # separately from ownership/permissions, preserving configuration limits.
+        info=regular(path,(1<<63)-1,metadata_only=True)
+        if info is None:raise ValueError('Binary missing')
+    except (ValueError,OSError):
+        return {**result,'state':'binary-metadata-review-required'}
+    result.update(binary_metadata_verified=True,binary_size_bytes=info.st_size)
+    if not 0<info.st_size<=PHP_BINARY_LIMIT:
+        return {**result,'state':'binary-size-review-required','maximum_binary_bytes':PHP_BINARY_LIMIT}
+    if not info.st_mode & 0o111:
+        return {**result,'state':'binary-not-executable'}
+    result['version_probe_attempted']=True
+    code,text=runner([str(path),'-n','-r','echo PHP_VERSION;'])
+    if code!=0:return {**result,'state':'binary-command-failed'}
+    version=php_version(text)
+    return {**result,**version,'state':'version-collected' if version.get('version')!='unknown' else 'binary-version-unverified'}
 
 def backend(root,actor,owner,as_web=False):
     # List domains only. Neither this probe nor its output can contain passwords.
@@ -82,13 +105,7 @@ def audit(root=ROOT,fs=Path('/'),actor='sabasadmin',owner='sabas',runner=run):
         binaries.append(fs/('usr/bin/php'+branch))
     for path in binaries:
         if verified and path.is_file():
-            try: regular(path,67108864)
-            except (ValueError,OSError):
-                output['php'].append({'runtime':path.name,'version':'unknown','state':'unsafe-binary-not-executed'});continue
-            code,text=runner([str(path),'-n','-r','echo PHP_VERSION;'])
-            row=php_version(text if code==0 else '')
-            row['runtime']='panel' if path==root/'php/bin/php' else path.name
-            output['php'].append(row)
+            output['php'].append(probe_php(path,'panel' if path==root/'php/bin/php' else path.name,runner))
     cfg=fs/'etc/hestiacp/professional/cloud-backup.json'
     try:
         from cloud_backup import settings
