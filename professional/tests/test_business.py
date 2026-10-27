@@ -112,7 +112,7 @@ class BusinessTests(unittest.TestCase):
             self.assertNotIn('proxy_cache_valid 404',text)
     def test_cache_hook_prepares_missing_parents_before_publishing_pool(self):
         pool=Path(b.pool_spec(self.fs,'clientone','example.com')['path'])
-        parent=self.fs/'var/cache/nginx/hestia-pro/clientone'
+        parent=self.fs/'var/cache/hestia-pro/clientone'
         self.assertFalse(parent.exists())
         install(self.root,self.fs,'clientone','example.com')
         self.assertTrue(parent.is_dir());self.assertTrue(pool.is_file())
@@ -125,21 +125,21 @@ class BusinessTests(unittest.TestCase):
         previous=os.umask(0o077)
         try:install(self.root,self.fs,'clientone','example.com')
         finally:os.umask(previous)
-        for suffix in ('var','var/cache','var/cache/nginx','var/cache/nginx/hestia-pro','var/cache/nginx/hestia-pro/clientone'):
+        for suffix in ('var','var/cache','var/cache/hestia-pro','var/cache/hestia-pro/clientone'):
             self.assertEqual((self.fs/suffix).stat().st_mode & 0o777,0o755)
     def test_cache_rejects_symlink_or_writable_parent_before_publishing(self):
         cache=self.fs/'var/cache';cache.mkdir(parents=True)
         outside=self.fs/'outside';outside.mkdir()
-        (cache/'nginx').symlink_to(outside,target_is_directory=True)
+        (cache/'hestia-pro').symlink_to(outside,target_is_directory=True)
         with self.assertRaises(OSError):install(self.root,self.fs,'clientone','example.com')
         self.assertEqual(list(outside.iterdir()),[])
-        (cache/'nginx').unlink();(cache/'nginx').mkdir(mode=0o777);(cache/'nginx').chmod(0o777)
+        (cache/'hestia-pro').unlink();(cache/'hestia-pro').mkdir(mode=0o777);(cache/'hestia-pro').chmod(0o777)
         with self.assertRaises(ValueError):install(self.root,self.fs,'clientone','example.com')
         self.assertFalse(Path(b.pool_spec(self.fs,'clientone','example.com')['path']).exists())
     def test_cache_transaction_prepares_before_native_command(self):
         p=self.plan('cache-profile',{'domain':'example.com','value':'professional-safe'})
         def runner(args):
-            self.assertTrue((self.fs/'var/cache/nginx/hestia-pro/clientone').is_dir())
+            self.assertTrue((self.fs/'var/cache/hestia-pro/clientone').is_dir())
             return self.runner(args)
         b.execute(self.root,self.fs,'admin',p['id'],runner=runner,now=1001)
     def test_resources_preserve_native_cpu_authority(self):

@@ -23,6 +23,7 @@ from apply import atomic_file, verify_deployment
 from assistant import domain
 
 MARKER = '# HESTIA_PRO_BUSINESS_V1'
+CACHE_BASE = '/var/cache/hestia-pro'
 ACTIONS = {'dns-ttl', 'mail-rate', 'cache-profile', 'ssh-policy', 'resources',
            'protection-profile','docker-operation','project-operation','cloud-operation','native-backup'}
 DELEGABLE = {'dns-ttl', 'mail-rate', 'cache-profile'}
@@ -94,12 +95,13 @@ def integer(value, low, high):
     if type(value) is not int or not low <= value <= high: raise ValueError('Number outside allowed range')
     return value
 
-def pool_spec(fs, owner, name):
+def pool_spec(fs, owner, name, legacy=False):
     username(owner); name = domain(name)
     suffix = hashlib.sha256(name.encode()).hexdigest()[:24]
+    cache = '/var/cache/nginx/hestia-pro' if legacy else CACHE_BASE
     return {'path': str(fs / 'etc/nginx/conf.d' / ('hestia-pro-cache-' + suffix + '.conf')),
             'mode': 0o644, 'body': MARKER + '\n# ' + owner + '/' + name + '\n' +
-            f'proxy_cache_path /var/cache/nginx/hestia-pro/{owner}/{name} levels=1:2 use_temp_path=off keys_zone=hpro_{name}:1m inactive=10m max_size=64m;\n'}
+            f'proxy_cache_path {cache}/{owner}/{name} levels=1:2 use_temp_path=off keys_zone=hpro_{name}:1m inactive=10m max_size=64m;\n'}
 
 def prepare_cache_parent(fs, owner):
     """Create root-controlled parents before nginx creates its worker-owned leaf.
@@ -109,7 +111,9 @@ def prepare_cache_parent(fs, owner):
     """
     username(owner)
     base = Path(fs).absolute()
-    target = base/'var/cache/nginx/hestia-pro'/owner
+    # The native nginx directory may legitimately belong to www-data. Use an
+    # independent root-controlled namespace; never change the native owner.
+    target = base/CACHE_BASE.lstrip('/')/owner
     fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in target.parts[1:]:

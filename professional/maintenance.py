@@ -6,16 +6,19 @@ No package upgrades, cloud transfers, WebDAV operations or account/password chan
 import argparse
 import configparser
 import json
+import os
 from pathlib import Path
 import re
+import secrets
 import subprocess
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from ops import require_root, private_directory, lock, safe_environment, username, utcnow
-from apply import verify_deployment
+from apply import verify_deployment, atomic_file
 from business import account, record, regular, prepare_cache_parent, pool_spec, MARKER
 from filemanager import enabled
 from mfa import root_json
+from assistant import domain
 
 ROOT=Path('/usr/local/hestia')
 MINIMUM={'8.2':(8,2,35),'8.3':(8,3,36),'8.4':(8,4,27),'8.5':(8,5,12)}
@@ -101,36 +104,69 @@ def audit(root=ROOT,fs=Path('/'),actor='sabasadmin',owner='sabas',runner=run):
     output['status']='review-required'  # Runtime versions and availability are not acceptance tests.
     return output
 
-def repair(root=ROOT,fs=Path('/'),enable_filemanager=False,start_nginx=False,runner=run):
+def repair(root=ROOT,fs=Path('/'),enable_filemanager=False,start_nginx=False,runner=run,cache_owner=None,cache_domain=None):
+    if cache_owner:username(cache_owner)
+    if cache_domain:cache_domain=domain(cache_domain)
     if verify_deployment(root)['state']!='verified':raise ValueError('Deployment integrity requires review')
     result={'state':'running','phase':'preflight','cache_parents':[],'nextcloud_or_webdav_modified':False,
             'twofa_bypassed':False,'packages_upgraded':False,'started_at':utcnow()}
     folder=private_directory(root/'data/professional-maintenance',0o700)
     receipt=folder/'last-repair.json'
-    with lock(folder/'repair.lock'):
+    with lock(root/'data/professional-business/locks/change.lock'),lock(folder/'repair.lock'):
+        if verify_deployment(root)['state']!='verified':raise ValueError('Deployment integrity requires review')
         root_json(receipt,result)
+        migrations=[];applied=[];service_touched=False;was_active=False
         try:
             pools=[]
             for path in sorted((fs/'etc/nginx/conf.d').glob('hestia-pro-cache-*.conf')):
                 data=regular(path)
                 match=re.match(re.escape(MARKER)+r'\n# ([a-z][a-z0-9_]{1,29})/([A-Za-z0-9.-]+)\n',data.decode() if data else '')
                 if not match:raise ValueError('Unrecognized cache configuration')
-                owner,name=match.groups();account(root,owner,target=True);record(root,owner,'web',name)
+                owner,name=match.groups()
+                if cache_owner and owner!=cache_owner:continue
+                if cache_domain and name!=cache_domain:continue
+                account(root,owner,target=True);record(root,owner,'web',name)
                 spec=pool_spec(fs,owner,name)
-                if str(path)!=spec['path'] or data!=spec['body'].encode():raise ValueError('Modified cache configuration')
+                legacy=pool_spec(fs,owner,name,legacy=True)['body'].encode()
+                if str(path)!=spec['path'] or data not in (spec['body'].encode(),legacy):raise ValueError('Modified cache configuration')
+                if data==legacy:
+                    if not cache_domain or not start_nginx:
+                        raise ValueError('Legacy cache migration requires an explicit domain and Nginx validation/start flag')
+                    info=path.stat()
+                    migrations.append({'path':path,'before':data,'body':spec['body'].encode(),
+                                       'mode':info.st_mode & 0o777,'gid':info.st_gid,'owner':owner,'domain':name})
                 pools.append(owner)
             previous=enabled(root) if enable_filemanager else None
             result['phase']='cache-parents';root_json(receipt,result)
             for owner in sorted(set(pools)):
                 prepare_cache_parent(fs,owner);result['cache_parents'].append(owner)
+            result['cache_migrated']=[]
+            if migrations:
+                result['phase']='cache-migration';root_json(receipt,result)
+                backup=folder/('cache-before-'+secrets.token_hex(12)+'.json')
+                root_json(backup,{'schema':1,'files':[{'path':str(i['path']),'body':i['before'].decode(),
+                                                    'mode':i['mode'],'gid':i['gid']} for i in migrations]})
+                result['cache_configuration_backup']=str(backup)
+                for item in migrations:
+                    if regular(item['path'])!=item['before']:raise ValueError('Cache configuration changed during repair')
+                    applied.append(item)
+                    atomic_file(item['path'],item['body'],0o644);os.chown(item['path'],0,0)
+                    result['cache_migrated'].append({'owner':item['owner'],'domain':item['domain']})
             if start_nginx:
                 result['phase']='nginx-validation';root_json(receipt,result)
                 if runner(['/usr/sbin/nginx','-t'])[0]!=0:raise ValueError('Nginx configuration test failed')
                 code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
-                if code!=0 or text.strip()!='active':
+                was_active=code==0 and text.strip()=='active'
+                if not was_active:
                     result['phase']='nginx-start';root_json(receipt,result)
+                    service_touched=True
                     if runner(['/usr/bin/systemctl','start','nginx'])[0]!=0:raise RuntimeError('Nginx start failed')
                     result['nginx_started']=True
+                elif migrations:
+                    result['phase']='nginx-reload';root_json(receipt,result)
+                    service_touched=True
+                    if runner(['/usr/bin/systemctl','reload','nginx'])[0]!=0:raise RuntimeError('Nginx reload failed')
+                    result['nginx_reloaded']=True
                 code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
                 if code!=0 or text.strip()!='active':raise RuntimeError('Nginx is not active')
                 result['nginx_active']=True
@@ -144,7 +180,24 @@ def repair(root=ROOT,fs=Path('/'),enable_filemanager=False,start_nginx=False,run
             result.update(state='repaired-local',phase='completed',finished_at=utcnow())
             root_json(receipt,result)
         except BaseException as error:
-            result.update(state='failed-or-partial',error=type(error).__name__,finished_at=utcnow())
+            result.update(state='failed-or-partial',error=type(error).__name__,reason=str(error)[:500],finished_at=utcnow())
+            if applied:
+                try:
+                    for item in reversed(applied):
+                        current=regular(item['path'])
+                        if current not in (item['before'],item['body']):raise ValueError('Cache changed outside repair; preserve for review')
+                        atomic_file(item['path'],item['before'],item['mode']);os.chown(item['path'],0,item['gid'])
+                    if service_touched:
+                        if runner(['/usr/sbin/nginx','-t'])[0]!=0:raise RuntimeError('Restored cache requires Nginx review')
+                        code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
+                        action='reload' if code==0 and text.strip()=='active' else 'start' if was_active else None
+                        if action:
+                            if runner(['/usr/bin/systemctl',action,'nginx'])[0]!=0:raise RuntimeError('Cache service recovery failed')
+                            code,text=runner(['/usr/bin/systemctl','is-active','nginx'])
+                            if code!=0 or text.strip()!='active':raise RuntimeError('Cache service recovery unverified')
+                    result['cache_rollback']='configuration-restored';result['cache_migrated']=[]
+                except BaseException:
+                    result['cache_rollback']='recovery-required'
             try:root_json(receipt,result)
             except OSError:pass
             raise
@@ -153,11 +206,13 @@ def repair(root=ROOT,fs=Path('/'),enable_filemanager=False,start_nginx=False,run
 def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('action',choices=('audit','repair-local'))
     p.add_argument('--actor',default='sabasadmin',type=username);p.add_argument('--owner',default='sabas',type=username)
+    p.add_argument('--domain',type=domain,help='Explicit domain required for legacy cache migration')
     p.add_argument('--enable-filemanager',action='store_true');p.add_argument('--start-nginx-if-stopped',action='store_true')
     args=p.parse_args();require_root()
     if args.action=='audit' and (args.enable_filemanager or args.start_nginx_if_stopped):raise ValueError('Repair flags require repair-local')
     result=audit(actor=args.actor,owner=args.owner) if args.action=='audit' else repair(
-        enable_filemanager=args.enable_filemanager,start_nginx=args.start_nginx_if_stopped)
+        enable_filemanager=args.enable_filemanager,start_nginx=args.start_nginx_if_stopped,
+        cache_owner=args.owner,cache_domain=args.domain)
     print(json.dumps(result,ensure_ascii=False,indent=2))
 
 if __name__=='__main__':

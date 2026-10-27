@@ -28,7 +28,7 @@ def main():
             for name,value in values.items():text=text.replace('%'+name+'%',value)
             text=text.replace('/var/log/apache2/domains/',str(base/'logs')+'/')
             templates.append(text)
-        pool=pool_spec(Path('/'),'clientone','example.test')['body'].replace('/var/cache/nginx/hestia-pro/clientone/example.test',str(base/'cache'))
+        pool=pool_spec(Path('/'),'clientone','example.test')['body'].replace('/var/cache/hestia-pro/clientone/example.test',str(base/'cache'))
         configuration=f'''user root root;
 error_log {base}/error.log;
 pid {base}/nginx.pid;

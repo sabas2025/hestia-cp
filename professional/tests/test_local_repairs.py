@@ -1,5 +1,6 @@
 """Regression tests for real integration failures; no production services are changed."""
 import json
+import errno
 import os
 from pathlib import Path
 import shutil
@@ -124,6 +125,97 @@ class MaintenanceTests(unittest.TestCase):
         with patch.object(maintenance.subprocess,'run',return_value=types.SimpleNamespace(returncode=0,stdout='[]')):
             result=maintenance.backend(self.root,'admin','clientone')
         self.assertFalse(result['available']);self.assertEqual(result['state'],'invalid-response')
+
+class CacheMigrationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup);self.base=Path(self.tmp.name)
+        self.root=self.base/'hestia';self.fs=self.base/'fs';self.calls=[]
+        (self.root/'conf').mkdir(parents=True);(self.root/'conf/hestia.conf').write_text("VERSION='1.10.5'\n")
+        user=self.root/'data/users/clientone';user.mkdir(parents=True)
+        (user/'user.conf').write_text("ROLE='user'\nSUSPENDED='no'\n")
+        (user/'web.conf').write_text("DOMAIN='example.com' PROXY='professional-safe'\nDOMAIN='cloud.example.com' PROXY='professional-safe'\n")
+        self.pools=[]
+        for name in ('example.com','cloud.example.com'):
+            spec=business.pool_spec(self.fs,'clientone',name,legacy=True)
+            path=Path(spec['path']);path.parent.mkdir(parents=True,exist_ok=True);path.write_text(spec['body']);path.chmod(0o640)
+            self.pools.append(path)
+        self.before=[p.read_bytes() for p in self.pools]
+        self.native=self.fs/'var/cache/nginx';self.native.mkdir(parents=True);self.native.chmod(0o755)
+        # Local user namespaces may map only uid 0. CI exercises the actual
+        # www-data uid too; mode 0777 already reproduces the rejected trust boundary.
+        try:os.chown(self.native,33,0)
+        except OSError as error:
+            if error.errno not in (errno.EPERM,errno.EINVAL):raise
+            self.native.chmod(0o777)
+        (self.native/'existing-native-cache').write_text('preserve native data')
+        self.native_info=(self.native.stat().st_uid,self.native.stat().st_gid,self.native.stat().st_mode)
+        self.policy=self.root/'data/professional-filemanager/policy.json';root_json(self.policy,{'schema':1,'enabled':False})
+        self.verify=patch.object(maintenance,'verify_deployment',return_value={'state':'verified'})
+        self.verify.start();self.addCleanup(self.verify.stop)
+    def runner(self,args):
+        self.calls.append(args);return (0,'active' if 'is-active' in args else '')
+    def repair(self,**changes):
+        args={'enable_filemanager':True,'start_nginx':True,'runner':self.runner,'cache_owner':'clientone','cache_domain':'example.com',**changes}
+        return maintenance.repair(self.root,self.fs,**args)
+    def receipt(self):return json.loads((self.root/'data/professional-maintenance/last-repair.json').read_text())
+    def assert_native_untouched(self):
+        self.assertEqual((self.native.stat().st_uid,self.native.stat().st_gid,self.native.stat().st_mode),self.native_info)
+        self.assertEqual((self.native/'existing-native-cache').read_text(),'preserve native data')
+        self.assertFalse((self.native/'hestia-pro').exists())
+    def test_native_worker_owned_or_writable_cache_is_preserved_and_selected_pool_migrates(self):
+        result=self.repair();self.assertEqual(result['state'],'repaired-local');self.assertTrue(result['nginx_reloaded'])
+        self.assertTrue(result['filemanager_enabled']);self.assertEqual(result['cache_migrated'],[{'owner':'clientone','domain':'example.com'}])
+        self.assertEqual(self.pools[0].read_text(),business.pool_spec(self.fs,'clientone','example.com')['body'])
+        self.assertEqual(self.pools[1].read_bytes(),self.before[1]);self.assert_native_untouched()
+        self.assertTrue((self.fs/'var/cache/hestia-pro/clientone').is_dir())
+        self.assertEqual(Path(result['cache_configuration_backup']).stat().st_mode & 0o777,0o600)
+        calls=len(self.calls);again=self.repair();self.assertEqual(again['cache_migrated'],[])
+        self.assertFalse(any('reload' in cmd for cmd in self.calls[calls:]));self.assert_native_untouched()
+    def test_failed_nginx_validation_restores_bytes_mode_and_keeps_policy_disabled(self):
+        def fail(args):self.calls.append(args);return 1,''
+        with self.assertRaises(ValueError):self.repair(runner=fail)
+        self.assertEqual([p.read_bytes() for p in self.pools],self.before)
+        self.assertEqual(self.pools[0].stat().st_mode & 0o777,0o640)
+        self.assertFalse(json.loads(self.policy.read_text())['enabled']);self.assert_native_untouched()
+        self.assertEqual(self.calls,[['/usr/sbin/nginx','-t']])
+        self.assertEqual(self.receipt()['cache_rollback'],'configuration-restored')
+    def test_reload_failure_restores_previous_configuration_and_recovers_active_service(self):
+        failed=False
+        def runner(args):
+            nonlocal failed
+            result=self.runner(args)
+            if 'reload' in args and not failed:failed=True;return 1,''
+            return result
+        with self.assertRaises(RuntimeError):self.repair(runner=runner)
+        self.assertEqual([p.read_bytes() for p in self.pools],self.before)
+        self.assertEqual(self.calls.count(['/usr/bin/systemctl','reload','nginx']),2)
+        self.assertEqual(self.receipt()['cache_rollback'],'configuration-restored')
+        self.assertFalse(json.loads(self.policy.read_text())['enabled']);self.assert_native_untouched()
+    def test_migration_requires_explicit_domain_and_validation_and_refuses_unknown_pool(self):
+        for changes in ({'cache_domain':None},{'start_nginx':False}):
+            with self.assertRaises(ValueError):self.repair(**changes)
+            self.assertEqual([p.read_bytes() for p in self.pools],self.before)
+        self.pools[0].write_bytes(self.before[0]+b'# custom configuration\n')
+        with self.assertRaises(ValueError):self.repair()
+        self.assertTrue(self.pools[0].read_text().endswith('# custom configuration\n'))
+        self.assertFalse((self.fs/'var/cache/hestia-pro').exists());self.assertEqual(self.calls,[])
+    def test_untrusted_new_namespace_is_rejected_before_any_pool_changes(self):
+        base=self.fs/'var/cache/hestia-pro';base.mkdir();base.chmod(0o777)
+        with self.assertRaises(ValueError):self.repair()
+        self.assertEqual([p.read_bytes() for p in self.pools],self.before)
+        self.assertFalse(json.loads(self.policy.read_text())['enabled']);self.assertEqual(self.calls,[])
+    def test_recovery_preserves_external_configuration_change_and_marks_review_required(self):
+        def runner(args):
+            result=self.runner(args)
+            if 'reload' in args:self.pools[0].write_text('external root change');return 1,''
+            return result
+        with self.assertRaises(RuntimeError):self.repair(runner=runner)
+        self.assertEqual(self.pools[0].read_text(),'external root change')
+        self.assertEqual(self.receipt()['cache_rollback'],'recovery-required')
+        self.assertFalse(json.loads(self.policy.read_text())['enabled'])
+    def test_concurrent_business_change_blocks_repair(self):
+        with business.lock(self.root/'data/professional-business/locks/change.lock'),self.assertRaises(BlockingIOError):self.repair()
+        self.assertEqual([p.read_bytes() for p in self.pools],self.before);self.assertEqual(self.calls,[])
 
 class AuditBoundaryTests(unittest.TestCase):
     def test_completed_initialization_cannot_mark_cloud_delivery_healthy(self):
