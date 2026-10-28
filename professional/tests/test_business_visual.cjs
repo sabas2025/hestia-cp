@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert/strict');
+const previewAsset = require('./preview-assets.cjs');
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 (async () => {
   const root = path.resolve(__dirname,'../..');
@@ -14,6 +15,7 @@ const {chromium} = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
       const page = await browser.newPage({viewport:{width,height:1100}}); const errors=[]; page.on('pageerror',error => errors.push(error.message));
       let plan=null; let state='planned';
       await page.route('https://hestia.test/**',async route => {
+        if (await previewAsset(route, root)) return;
         const request=route.request();
         if (request.method() === 'GET') { await route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'professional/business-preview.html'),'utf8')}); return; }
         const fields=new URLSearchParams(request.postData()); assert.equal(fields.get('token'),'PREVIEW_ONLY');

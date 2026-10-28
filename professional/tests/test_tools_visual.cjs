@@ -1,5 +1,6 @@
 // Real PHP views and JavaScript, with explicit mocked HTTP/service responses.
 const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const previewAsset=require('./preview-assets.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 (async()=>{
   const root=path.resolve(__dirname,'../..'),out=process.env.VISUAL_OUTPUT||path.join(root,'professional/test-results/visual');
@@ -8,6 +9,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
   try {for(const width of [360,768,1440])for(const tool of ['editor','platform']){
     const page=await browser.newPage({viewport:{width,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));let saves=0,requests=0,renames=0,uploads=0;let listedName='index.txt';let uploaded=[];
     await page.route('https://hestia.test/**',async route=>{
+      if(await previewAsset(route,root))return;
       const req=route.request();if(req.method()==='GET'){await route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,`professional/${tool}-preview.html`),'utf8')});return;}
       const fields=new URLSearchParams(req.postData());assert.equal(fields.get('token'),'PREVIEW_ONLY');const op=fields.get('op'),input=JSON.parse(fields.get('request'));let data;
       if(op==='domains')data={domains:['example.com']};

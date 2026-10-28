@@ -42,6 +42,10 @@ jobs:
           sudo mkdir -p /run/sshd
           npm ci --ignore-scripts --prefix professional/tests/browser
           professional/tests/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Build native Hestia assets for shared-layout browser checks
+        run: |
+          npm ci --ignore-scripts
+          npm run build
       - name: Fetch exact Composer-locked TOTP library for the isolated test
         run: |
           mkdir -p .qa/twofactor
@@ -57,6 +61,17 @@ jobs:
             CHROME_BIN="$browser_path" /usr/bin/python3 professional/tests/run_checks.py --output /tmp/hestia-verification.json
       - name: Verify the exact pinned update archive without accessing the VPS
         run: sudo /usr/bin/python3 professional/tests/validate_update_archive.py
+      - name: Preserve synthetic browser evidence and verification report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: professional-layout-verification
+          path: |
+            /tmp/hestia-verification.json
+            .qa/native-layout/
+            professional/test-results/visual/
+          include-hidden-files: true
+          retention-days: 7
       - name: Check advisories for locked dependencies
         run: |
           composer --working-dir=web/inc audit --locked --no-dev
@@ -66,7 +81,5 @@ jobs:
           npm audit --prefix professional/tests/browser --package-lock-only --ignore-scripts --audit-level=high
       - name: Validate build and documentation tools after dependency updates
         run: |
-          npm ci --ignore-scripts
-          npm run build
           npm run docs:test
           npm run docs:build

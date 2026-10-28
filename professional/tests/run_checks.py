@@ -58,6 +58,7 @@ def main():
         run('Browser desktop and mobile',[node,str(ROOT/'professional/tests/test_visual.cjs')])
         run('Operations browser desktop and mobile',[node,str(ROOT/'professional/tests/test_business_visual.cjs')])
         run('Editor and platform browser desktop and mobile',[node,str(ROOT/'professional/tests/test_tools_visual.cjs')])
+        run('Native Hestia layout, themes and strict CSP',[node,str(ROOT/'professional/tests/test_native_layout.cjs')])
     else: result['checks'].append({'name':'Browser desktop and mobile','status':'unavailable'})
     result['mode'] = 'quick' if args.quick else 'release'
     complete = outcome.wasSuccessful() and not outcome.skipped and all(c['status']=='passed' for c in result['checks'])
