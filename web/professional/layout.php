@@ -50,7 +50,11 @@ function pro_layout_open(string $title, string $section, array $identity,
     $token = rawurlencode((string)($_SESSION['token'] ?? ''));
     $settings = '/edit/user/?user=' . rawurlencode($owner) . '&token=' . $token;
     $tabs = [];
-    if ($admin) { $tabs[] = ['USUÁRIO', '/list/user/', 'fa-users', 'U_USERS', 'USERS']; }
+    if ($admin && ($_SESSION['POLICY_SYSTEM_HIDE_ADMIN'] ?? '') === 'yes' &&
+        ($_SESSION['user'] ?? '') !== ($_SESSION['ROOT_USER'] ?? '')) {
+        $account['U_USERS'] = max(0, (int)($account['U_USERS'] ?? 0) - 1);
+    }
+    if ($admin) { $tabs[] = ['USUÁRIO', '/list/user/', 'fa-users', 'U_USERS', '']; }
     foreach ([['WEB', 'web', 'fa-earth-americas', 'U_WEB_DOMAINS', 'WEB_DOMAINS', 'WEB_SYSTEM'],
               ['DNS', 'dns', 'fa-book-atlas', 'U_DNS_DOMAINS', 'DNS_DOMAINS', 'DNS_SYSTEM'],
               ['E-MAIL', 'mail', 'fa-envelope', 'U_MAIL_DOMAINS', 'MAIL_DOMAINS', 'MAIL_SYSTEM'],
@@ -104,7 +108,7 @@ function pro_layout_open(string $title, string $section, array $identity,
     </div></div>
     <nav class="main-menu" aria-label="Painel HestiaCP"><div class="container"><ul class="main-menu-list">
       <?php foreach ($tabs as [$label, $href, $icon, $count, $quota]): ?>
-      <li class="main-menu-item"><a class="main-menu-item-link" href="<?= $href ?>"><p class="main-menu-item-label"><?= $label ?><i class="fas <?= $icon ?>" aria-hidden="true"></i></p><ul class="main-menu-stats"><li><?= pro_escape($account[$count] ?? '0') ?> / <?= pro_escape(($account[$quota] ?? '') === 'unlimited' ? '∞' : ($account[$quota] ?? '—')) ?></li></ul></a></li>
+      <li class="main-menu-item"><a class="main-menu-item-link" href="<?= $href ?>"><p class="main-menu-item-label"><?= $label ?><i class="fas <?= $icon ?>" aria-hidden="true"></i></p><ul class="main-menu-stats"><li><?= $quota === '' ? 'Usuários: ' : '' ?><?= pro_escape($account[$count] ?? '0') ?><?php if ($quota !== ''): ?> / <?= pro_escape(($account[$quota] ?? '') === 'unlimited' ? '∞' : ($account[$quota] ?? '—')) ?><?php endif; ?></li></ul></a></li>
       <?php endforeach; ?>
       <li class="main-menu-item"><a class="main-menu-item-link active" href="/professional/" aria-current="true"><p class="main-menu-item-label">PROFESSIONAL<i class="fas fa-layer-group" aria-hidden="true"></i></p><ul class="main-menu-stats"><li>Central de hospedagem</li></ul></a></li>
     </ul></div></nav>
