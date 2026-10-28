@@ -14,4 +14,5 @@ $payload = ['overlay_version' => json_decode(file_get_contents(__DIR__ . '/../co
     ['name' => 'Certificado', 'state' => 'warning', 'detail' => 'Renovação em 18 dias'],
     ['name' => 'Inodes', 'state' => 'ok', 'detail' => '9% utilizado']]]];
 foreach (['web' => 6, 'mail' => 2, 'db' => 4, 'backup' => 7, 'cron' => 3, 'dns' => 6] as $key => $count) $payload['resources'][$key] = ['count' => $count, 'enabled' => true];
+require __DIR__.'/preview-layout-fixture.php';
 include __DIR__ . '/../../web/professional/view.php';

@@ -4,4 +4,5 @@ require __DIR__ . '/../../web/professional/model.php';
 define('HST_PRO_MFA_VIEW', true);
 $_SESSION = ['token'=>'PREVIEW_ONLY'];
 $enabled = false; $result = []; $error = '';
+require __DIR__.'/preview-layout-fixture.php';
 include __DIR__ . '/../../web/professional/twofactor-view.php';

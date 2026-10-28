@@ -9,7 +9,21 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 php = os.environ.get('PHP_BINARY') or shutil.which('php')
 if not php: raise SystemExit('PHP required')
+
+def native_assets(html):
+    """Use the built native CSS; keep repository-relative fonts and images portable."""
+    def stylesheet(match):
+        href = match.group(1)
+        if not href.startswith('/css/themes/'):
+            return match.group(0)
+        path = ROOT / 'web' / href.lstrip('/')
+        css = path.read_text().replace('/webfonts/', '../web/webfonts/').replace('/images/', '../web/images/')
+        return '<style>' + css + '</style>'
+    html = re.sub(r'<link rel="stylesheet" href="([^"]+)">', stylesheet, html)
+    return html.replace('href="/images/', 'href="../web/images/').replace('src="/images/', 'src="../web/images/')
+
 html = subprocess.check_output([php, '-n', str(ROOT / 'professional/tests/render_preview.php')], text=True)
+html = native_assets(html)
 html = html.replace('<link rel="stylesheet" href="/professional/dashboard.css">', '<style>' + (ROOT / 'web/professional/dashboard.css').read_text() + '</style>')
 html = html.replace('<script src="/professional/dashboard.js" defer></script>', '')
 html = html.replace('</body>', '<script>' + (ROOT / 'web/professional/dashboard.js').read_text() + '</script></body>')
@@ -17,11 +31,13 @@ html = html.replace('Consulta atualizada', 'Prévia com dados ilustrativos')
 html = re.sub(r'Central profissional [0-9.]+ · HestiaCP', 'Prévia · Nenhum servidor conectado', html)
 (ROOT / 'professional/preview.html').write_text(html)
 mfa = subprocess.check_output([php, '-n', str(ROOT / 'professional/tests/render_twofactor_preview.php')], text=True)
+mfa = native_assets(mfa)
 mfa = mfa.replace('<link rel="stylesheet" href="/professional/dashboard.css">', '<style>' + (ROOT / 'web/professional/dashboard.css').read_text() + '</style>')
 mfa = mfa.replace('<main class="pro-main">', '<main class="pro-main"><p class="pro-banner">Prévia ilustrativa · Nenhum servidor conectado · A2F não ativada</p>')
 (ROOT / 'professional/twofactor-preview.html').write_text(mfa)
 print('Standalone preview generated from the PHP template; illustrative data only')
 business = subprocess.check_output([php, '-n', str(ROOT / 'professional/tests/render_business_preview.php')], text=True)
+business = native_assets(business)
 business = business.replace('<link rel="stylesheet" href="/professional/dashboard.css">', '<style>' + (ROOT / 'web/professional/dashboard.css').read_text() + '</style>')
 business = business.replace('<script src="/professional/business.js" defer></script>', '')
 business = business.replace('</body>', '<script>' + (ROOT / 'web/professional/business.js').read_text() + '</script></body>')
@@ -29,6 +45,7 @@ business = business.replace('<h1>Operações do servidor</h1>', '<h1>Operações
 (ROOT / 'professional/business-preview.html').write_text(business)
 for tool in ('editor','platform'):
     html=subprocess.check_output([php,'-n',str(ROOT/'professional/tests/render_tools_preview.php'),tool],text=True)
+    html=native_assets(html)
     html=html.replace('<link rel="stylesheet" href="/professional/dashboard.css">','<style>'+(ROOT/'web/professional/dashboard.css').read_text()+'</style>')
     html=html.replace('<link rel="stylesheet" href="/professional/filemanager.css">','<style>'+(ROOT/'web/professional/filemanager.css').read_text()+'</style>')
     html=html.replace(f'<script src="/professional/{tool}.js" defer></script>','')

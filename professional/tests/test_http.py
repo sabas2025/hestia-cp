@@ -43,7 +43,7 @@ echo json_encode(['referer'=>$_SERVER['HTTP_REFERER']??'']);
         shutil.copytree(ROOT/'web/reset2fa',cls.root/'web/reset2fa')
         (cls.root/'web/inc/main.php').write_text('''<?php
 if (!isset($_SERVER['HTTP_X_TEST_USER'])) { header('Location: /login/'); exit; }
-$_SESSION=['user'=>$_SERVER['HTTP_X_TEST_USER'],'userContext'=>$_SERVER['HTTP_X_TEST_CONTEXT']??'user','look'=>$_SERVER['HTTP_X_TEST_LOOK']??'','ROOT_USER'=>'admin','VERSION'=>$_SERVER['HTTP_X_TEST_VERSION']??'1.10.5','APP_NAME'=>'Test','token'=>'TEST_SESSION_TOKEN'];
+$_SESSION=['user'=>$_SERVER['HTTP_X_TEST_USER'],'userContext'=>$_SERVER['HTTP_X_TEST_CONTEXT']??'user','look'=>$_SERVER['HTTP_X_TEST_LOOK']??'','ROOT_USER'=>'admin','VERSION'=>$_SERVER['HTTP_X_TEST_VERSION']??'1.10.5','APP_NAME'=>'Test','token'=>'TEST_SESSION_TOKEN','THEME'=>$_SERVER['HTTP_X_TEST_THEME']??'default'];
 $read_only=($_SERVER['HTTP_X_TEST_READ_ONLY']??'')==='yes';
 $user_data=['ROLE'=>$_SERVER['HTTP_X_TEST_ROLE']??'user','SUSPENDED'=>$_SERVER['HTTP_X_TEST_SUSPENDED']??'no'];
 function get_user_data($name) { return [$name=>['ROLE'=>'user','SUSPENDED'=>'no','WEB_DOMAINS'=>'0','MAIL_DOMAINS'=>'0','DNS_DOMAINS'=>'0','DATABASES'=>'0','CRON_JOBS'=>'0','BACKUPS'=>'0']]; }
@@ -82,6 +82,32 @@ return ['state'=>'fixture-only']; }
     def test_authenticated_page_security_headers(self):
         status,headers,body=self.request(headers=self.user())
         self.assertEqual(status,200);self.assertIn('Visão geral',body);self.assertIn('no-store',headers['Cache-Control']);self.assertIn("frame-ancestors 'none'",headers['Content-Security-Policy'])
+    def test_shared_layout_preserves_roles_and_scriptless_twofactor(self):
+        admin=self.user(**{'X-Test-User':'admin','X-Test-Context':'admin','X-Test-Role':'admin'})
+        for path in ('/professional/','/professional/business.php','/professional/editor.php','/professional/platform.php','/professional/twofactor.php'):
+            with self.subTest(path=path):
+                status,headers,body=self.request(path,admin)
+                self.assertEqual(status,200)
+                self.assertEqual(body.count('<header class="app-header">'),1)
+                self.assertIn('/css/themes/default.min.css',body)
+                self.assertEqual(body.count('aria-current="page"'),1)
+                self.assertIn('href="/list/server/"',body)
+                self.assertNotIn('unsafe-inline',headers['Content-Security-Policy'])
+                self.assertNotIn('unsafe-eval',headers['Content-Security-Policy'])
+                self.assertNotIn('alpinejs',body)
+                if path.endswith('twofactor.php'):
+                    self.assertIn("script-src 'none'",headers['Content-Security-Policy'])
+                    self.assertNotIn('<script',body)
+        _,_,body=self.request(headers=self.user())
+        self.assertNotIn('href="/list/server/"',body)
+        self.assertNotIn('href="/list/user/"',body)
+        self.assertNotIn('href="/professional/platform.php"',body)
+    def test_shared_layout_refuses_direct_access_and_unsafe_theme_paths(self):
+        self.assertEqual(self.request('/professional/layout.php')[0],403)
+        for theme in ('../../etc/passwd','"><script>alert(1)</script>','https://foreign.invalid/theme'):
+            _,_,body=self.request(headers=self.user(**{'X-Test-Theme':theme}))
+            self.assertIn('/css/themes/default.min.css',body)
+            self.assertNotIn(theme,body)
     def test_file_manager_domain_prefill_is_inert_and_escaped(self):
         status,_,body=self.request('/professional/editor.php?domain=example.com',self.user())
         self.assertEqual(status,200);self.assertIn('data-domain="example.com"',body)

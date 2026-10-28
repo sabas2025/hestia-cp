@@ -39,7 +39,7 @@
       const row = document.createElement('div'); row.className = 'pro-operation';
       const text = document.createElement('p'); text.textContent = `${names[entry.action]} · ${entry.owner} · ${states[entry.state] || entry.state}${entry.job_state ? ' · fila: '+(states[entry.job_state] || entry.job_state) : ''}`; row.append(text);
       if (!['queued','running','interrupted-review'].includes(entry.job_state) && ['planned','applied'].includes(entry.state) && (entry.state!=='applied'||entry.reversible!==false)) {
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'pro-button'; button.textContent = entry.state === 'applied' ? 'Revisar reversão' : 'Revisar plano';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'button pro-button'; button.textContent = entry.state === 'applied' ? 'Revisar reversão' : 'Revisar plano';
         button.addEventListener('click',() => { review(entry,entry.state === 'applied' ? 'rollback' : 'apply'); q('plan-summary').scrollIntoView({block:'center'}); }); row.append(button);
       }
       q('history-list').append(row);
